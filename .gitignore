@@ -1,0 +1,7 @@
+.claude/
+.gradle/
+.idea/
+build/
+.envrc
+ours.json
+theirs.json
