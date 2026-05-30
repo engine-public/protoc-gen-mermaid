@@ -64,6 +64,20 @@ public class ProtocGenMermaid(
          */
         public val suppressVisibility: Boolean,
         /**
+         * Which diagram outputs the compiler emits per compile invocation.  Default is every
+         * [DiagramType].  See each enum value for what file(s) it produces and how each is named.
+         * Restrict via the protoc parameter string (`--mermaid_out=diagramTypes=COMPLETE:...`) or
+         * the DSL block (`diagramTypes = listOf(DiagramType.FILE_OVERVIEW)`).  Empty list = no
+         * output (useful only in tests).
+         */
+        public val diagramTypes: List<DiagramType>,
+        /**
+         * How `oneof` groups are rendered inside a containing message's class block.  See
+         * [OneofRenderingType] for what each value produces; default is
+         * [OneofRenderingType.EMBEDDED].
+         */
+        public val oneofRenderingType: OneofRenderingType,
+        /**
          * When true (default), protobuf well-known types (anything under the `google.protobuf.*`
          * namespace — `Timestamp`, `Duration`, `Any`, `Empty`, `Struct`, `FieldMask`, `Value`,
          * the `*Value` wrappers, etc.) are suppressed from the relationship graph: no class block,
@@ -83,6 +97,63 @@ public class ProtocGenMermaid(
          */
         public val direction: Direction,
     ) {
+
+        /**
+         * The diagram-kind taxonomy.  Add a new value here, then handle it in
+         * [com.engine.protoc.mermaid.compile.Compiler.compile].
+         */
+        public enum class DiagramType {
+            /**
+             * One file per input `.proto`.  Contains a Mermaid `classDiagram` with every top-level
+             * enum and message defined in that file, plus an association arrow per message field
+             * whose type is another message or enum.  Filename = the proto's relative path with
+             * `.proto` swapped for `.mermaid`.
+             */
+            FILE_OVERVIEW,
+
+            /**
+             * One file per top-level message in scope.  Contains the focus message's class block,
+             * a class block for every type it references via a field, a class block for every
+             * other message in scope that has a field referencing it, and only the association
+             * arrows that touch the focus message (no relationships between the surrounding
+             * classes are drawn).  Filename = fully-qualified message name + `.mermaid`
+             * (e.g. `pkg.sub.Msg.mermaid`).
+             */
+            MESSAGE,
+
+            /**
+             * One file aggregating the entire compile scope.  Contains every top-level enum and
+             * message across all input protos plus every association arrow between them.
+             * Filename = the largest common dotted-package prefix of the input protos + `.mermaid`
+             * (e.g. `pkg.sub.mermaid`); falls back to `complete.mermaid` if the inputs share no
+             * package prefix.
+             */
+            COMPLETE,
+        }
+
+        /**
+         * The oneof-rendering taxonomy.  Selects how `oneof` groups are rendered.  Add a new value
+         * here, then handle it in [com.engine.protoc.mermaid.compile.Compiler] where oneof members
+         * are emitted.
+         */
+        public enum class OneofRenderingType {
+            /**
+             * Oneof members live inline in the parent message's class block, grouped under an
+             * `«oneof <name>»` stereotype header at the position where the oneof appears in the
+             * proto source.  Each member field line is visually indented (leading `&nbsp;&nbsp;`)
+             * to associate it with the header.  No additional class is introduced; mutual
+             * exclusion is conveyed only by the grouping header.
+             */
+            EMBEDDED,
+
+            /**
+             * Each oneof is extracted into its own pseudo-class named `<MessageName>.<oneofName>`
+             * with the `<<oneof>>` stereotype, listing the oneof's member fields.  The parent
+             * message gains a composition arrow `Parent *-- "0..1" Parent.<oneofName> : <oneofName>`,
+             * making the optionality of the whole oneof slot explicit on the arrow.
+             */
+            SEPARATE,
+        }
 
         /**
          * Layout-flow taxonomy mirroring Mermaid's `direction` directive.  The four cardinal
@@ -112,6 +183,12 @@ public class ProtocGenMermaid(
 
             public var suppressVisibility: Boolean = parameters.get<Boolean>("suppressVisibility") ?: true
 
+            public var diagramTypes: List<DiagramType> =
+                parameters.get<List<DiagramType>>("diagramTypes") ?: DiagramType.entries.toList()
+
+            public var oneofRenderingType: OneofRenderingType =
+                parameters.get<OneofRenderingType>("oneofRenderingType") ?: OneofRenderingType.EMBEDDED
+
             public var suppressWellKnownTypes: Boolean = parameters.get<Boolean>("suppressWellKnownTypes") ?: true
 
             public var direction: Direction = parameters.get<Direction>("direction") ?: Direction.TB
@@ -126,6 +203,8 @@ public class ProtocGenMermaid(
                     hierarchicalNamespaces = hierarchicalNamespaces,
                     suppressNamespaces = suppressNamespaces,
                     suppressVisibility = suppressVisibility,
+                    diagramTypes = diagramTypes,
+                    oneofRenderingType = oneofRenderingType,
                     suppressWellKnownTypes = suppressWellKnownTypes,
                     direction = direction,
                 )

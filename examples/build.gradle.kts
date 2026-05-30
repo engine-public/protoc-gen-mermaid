@@ -28,6 +28,8 @@ val suiteRecorderOptions =
         "suppressVisibility" to listOf("suppressVisibility=false"),
         "suppressWellKnownTypes" to listOf("suppressWellKnownTypes=false"),
         "direction" to listOf("direction=LR"),
+        "diagramTypes" to listOf("diagramTypes=COMPLETE"),
+        "oneofRenderingType" to listOf("oneofRenderingType=SEPARATE"),
     )
 
 dependencies {

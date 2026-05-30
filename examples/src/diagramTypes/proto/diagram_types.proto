@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.diagramtypes;
+
+option java_package = "com.engine.protoc.mermaid.example.diagramtypes";
+option java_multiple_files = true;
+
+// Exercises `diagramTypes=COMPLETE`: with the default (every DiagramType) this proto
+// would produce a FILE_OVERVIEW file, two MESSAGE files (one per message), and a
+// COMPLETE file.  Restricting to COMPLETE alone leaves only the aggregate diagram,
+// making the option's effect visible just by counting fixture files.
+message Alpha {
+    string id = 1;
+}
+
+message Beta {
+    string id = 1;
+}

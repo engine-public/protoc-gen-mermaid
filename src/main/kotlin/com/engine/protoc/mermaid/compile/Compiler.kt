@@ -1,7 +1,9 @@
 package com.engine.protoc.mermaid.compile
 
 import com.engine.protoc.mermaid.ProtocGenMermaid
+import com.engine.protoc.mermaid.ProtocGenMermaid.Options.DiagramType
 import com.engine.protoc.mermaid.ProtocGenMermaid.Options.Direction
+import com.engine.protoc.mermaid.ProtocGenMermaid.Options.OneofRenderingType
 import com.engine.protoc.util.SyntaxElement
 import com.engine.protoc.util.compiler.CodeGeneratorRequestWrapper
 import com.engine.protoc.util.compiler.CodeGeneratorResponseWrapper
@@ -49,9 +51,15 @@ internal class Compiler(
 
     internal fun compile(): PluginProtos.CodeGeneratorResponse {
         val response = CodeGeneratorResponseWrapper()
-        for (file in index.files) response.addFile(overviewFilename(file), render(overviewDiagram(file)))
-        for (entry in messageEntries) response.addFile("${entry.fqn}.mermaid", render(messageDiagram(entry)))
-        response.addFile(completeFilename(), render(completeDiagram()))
+        if (DiagramType.FILE_OVERVIEW in options.diagramTypes) {
+            for (file in index.files) response.addFile(overviewFilename(file), render(overviewDiagram(file)))
+        }
+        if (DiagramType.MESSAGE in options.diagramTypes) {
+            for (entry in messageEntries) response.addFile("${entry.fqn}.mermaid", render(messageDiagram(entry)))
+        }
+        if (DiagramType.COMPLETE in options.diagramTypes) {
+            response.addFile(completeFilename(), render(completeDiagram()))
+        }
         return response.build()
     }
 
@@ -180,6 +188,7 @@ internal class Compiler(
                     if (methodTargetId(m.outputType?.value) == focusId) add("$svcName ..> \"1\" $focusId : $mname")
                 }
             }
+            addAll(oneofCompositionArrows(listOf(focus) + incomingMessages))
             addAll(nestingArrows(allMessages, included))
         }
 
@@ -193,7 +202,10 @@ internal class Compiler(
         enums: List<EnumDescriptorProtoWrapper>,
     ): List<String> {
         val included = includedIds(enums, messages)
-        return fieldArrows(messages) + serviceArrows(services) + nestingArrows(messages, included)
+        return fieldArrows(messages) +
+            oneofCompositionArrows(messages) +
+            serviceArrows(services) +
+            nestingArrows(messages, included)
     }
 
     private fun includedIds(
@@ -346,11 +358,58 @@ internal class Compiler(
     ) {
         if (msg.name?.value == null) return
         val decl = classDeclaration(index.refOf(msg))
-        if (msg.fields.isEmpty()) {
+        val separate = options.oneofRenderingType == OneofRenderingType.SEPARATE
+        /*
+         * In SEPARATE mode the real-oneof fields are pulled out of the parent class block into
+         * their own pseudo-classes below.  In EMBEDDED mode every field stays in the parent block;
+         * oneof grouping is conveyed by an inline `«oneof <name>»` header and indented members.
+         * Synthetic single-field oneofs (proto3's `optional` wrappers) render as regular fields
+         * in both modes — see [inRealOneof].
+         */
+        val bodyFields = if (separate) msg.fields.filterNot { inRealOneof(msg, it) } else msg.fields
+        if (bodyFields.isEmpty()) {
             appendLine("$indent$decl")
         } else {
             appendLine("$indent$decl {")
-            for (field in msg.fields) appendLine("$indent    ${renderField(msg, field)}")
+            renderFieldsWithOneofGroups(msg, bodyFields, indent)
+            appendLine("$indent}")
+        }
+        if (separate) renderOneofPseudoClasses(msg, indent)
+    }
+
+    private fun StringBuilder.renderFieldsWithOneofGroups(
+        msg: DescriptorProtoWrapper,
+        fields: List<FieldDescriptorProtoWrapper>,
+        indent: String,
+    ) {
+        val embedded = options.oneofRenderingType == OneofRenderingType.EMBEDDED
+        var currentGroup: Int? = null
+        for (field in fields) {
+            val group = field.oneofIndex?.value?.takeIf { embedded && !isSyntheticOneof(msg, it) }
+            if (group != null && group != currentGroup) {
+                appendLine("$indent    «oneof ${msg.oneofDecls[group].name?.value ?: "?"}»")
+            }
+            currentGroup = group
+            val prefix = if (group != null) "&nbsp;&nbsp;" else ""
+            appendLine("$indent    $prefix${renderField(msg, field)}")
+        }
+    }
+
+    private fun StringBuilder.renderOneofPseudoClasses(
+        msg: DescriptorProtoWrapper,
+        indent: String,
+    ) {
+        val parentRef = index.refOf(msg)
+        if (parentRef.id.isEmpty()) return
+        msg.oneofDecls.forEachIndexed { idx, oneof ->
+            if (isSyntheticOneof(msg, idx)) return@forEachIndexed
+            val oneofName = oneof.name?.value ?: return@forEachIndexed
+            val members = msg.fields.filter { it.oneofIndex?.value == idx }
+            if (members.isEmpty()) return@forEachIndexed
+            appendLine()
+            appendLine("${indent}class ${oneofClassId(parentRef.id, oneofName)}[\"${parentRef.label}.$oneofName\"] {")
+            appendLine("$indent    <<oneof>>")
+            for (f in members) appendLine("$indent    ${renderField(msg, f)}")
             appendLine("$indent}")
         }
     }
@@ -420,7 +479,7 @@ internal class Compiler(
     ): String? {
         val target = fieldTargetId(msg, field) ?: return null
         val name = field.name?.value ?: return null
-        val source = index.refOf(msg).id.takeIf { it.isNotEmpty() } ?: return null
+        val source = arrowSource(msg, field) ?: return null
         return "$source --> \"${cardinality(msg, field)}\" $target : $name"
     }
 
@@ -473,6 +532,22 @@ internal class Compiler(
             }
         }
 
+    /** Composition arrows from a message to each of its real-oneof pseudo-classes (SEPARATE mode only). */
+    private fun oneofCompositionArrows(messages: List<DescriptorProtoWrapper>): List<String> {
+        if (options.oneofRenderingType != OneofRenderingType.SEPARATE) return emptyList()
+        return buildList {
+            for (msg in messages) {
+                val parentId = index.refOf(msg).id.takeIf { it.isNotEmpty() } ?: continue
+                msg.oneofDecls.forEachIndexed { idx, decl ->
+                    if (isSyntheticOneof(msg, idx)) return@forEachIndexed
+                    val name = decl.name?.value ?: return@forEachIndexed
+                    if (msg.fields.none { it.oneofIndex?.value == idx }) return@forEachIndexed
+                    add("$parentId *-- \"0..1\" ${oneofClassId(parentId, name)} : $name")
+                }
+            }
+        }
+    }
+
     /**
      * Composition arrows `Parent *-- Child : nested` for every direct nesting pair where both
      * endpoints appear in [includedIds].  Iterates [messages] in preorder and lists each parent's
@@ -507,8 +582,56 @@ internal class Compiler(
         if (field.label?.value == Label.LABEL_REPEATED) return "*"
         return when (field.type?.value) {
             Type.TYPE_MESSAGE, Type.TYPE_GROUP -> "0..1"
-            else -> if (isExplicitOptional(field, index.syntaxOf(msg))) "0..1" else "1"
+            else -> if (inRealOneof(msg, field) || isExplicitOptional(field, index.syntaxOf(msg))) "0..1" else "1"
         }
+    }
+
+    /**
+     * Whether [msg]'s `oneof_decl[oneofIndex]` is a synthetic wrapper protobuf injects to represent
+     * a proto3 `optional` field.  Such wrappers always have exactly one member whose
+     * `proto3_optional` flag is set; treating them as real oneofs would give every proto3
+     * `optional` field its own header/pseudo-class, which is nonsense.
+     */
+    private fun isSyntheticOneof(
+        msg: DescriptorProtoWrapper,
+        oneofIndex: Int,
+    ): Boolean {
+        val members = msg.fields.filter { it.oneofIndex?.value == oneofIndex }
+        return members.size == 1 && members.single().proto3Optional?.value == true
+    }
+
+    private fun inRealOneof(
+        msg: DescriptorProtoWrapper,
+        field: FieldDescriptorProtoWrapper,
+    ): Boolean {
+        val idx = field.oneofIndex?.value ?: return false
+        return !isSyntheticOneof(msg, idx)
+    }
+
+    /**
+     * Mermaid class identifier for the SEPARATE-mode oneof pseudo-class of `<parent>.<oneofName>`.
+     * Joined with `_` because Mermaid class identifiers may not contain `.`; the dotted form
+     * survives as the pseudo-class's display label.
+     */
+    private fun oneofClassId(
+        parentId: String,
+        oneofName: String,
+    ): String = "${parentId}_$oneofName"
+
+    /**
+     * Identifier the association arrow should originate from for [field]: the parent's own id, or
+     * its oneof pseudo-class's id when in SEPARATE mode and [field] is a real-oneof member.
+     */
+    private fun arrowSource(
+        msg: DescriptorProtoWrapper,
+        field: FieldDescriptorProtoWrapper,
+    ): String? {
+        val parentId = index.refOf(msg).id.takeIf { it.isNotEmpty() } ?: return null
+        if (options.oneofRenderingType != OneofRenderingType.SEPARATE) return parentId
+        val idx = field.oneofIndex?.value ?: return parentId
+        if (isSyntheticOneof(msg, idx)) return parentId
+        val oneofName = msg.oneofDecls[idx].name?.value ?: return parentId
+        return oneofClassId(parentId, oneofName)
     }
 
     /**
