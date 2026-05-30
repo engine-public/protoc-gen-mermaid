@@ -1,0 +1,73 @@
+---
+name: Build
+on:
+  workflow_call:
+    inputs:
+      build_version:
+        description: "The version to build.  It must be semver-compliant, and must not be for a tag that already exists."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: 'true'
+          fetch-depth: 0
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@f744c72a42b1995d7b0cbc314bde4bace7ac1fe1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          native-image-job-reports: 'true'
+
+      - name: Setup gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # https://github.com/gradle/actions/releases/tag/v6.1.0
+
+      - name: Determine Build Version
+        env:
+          ENGINE_BUILD_VERSION: ${{ inputs.build_version }}
+        run: |
+          ./gradlew writeVersion
+
+      - name: Read Version File
+        id: getversion
+        run: |
+          test -f build/version.txt
+          echo "version=$(cat build/version.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          ENGINE_BUILD_VERSION: ${{ steps.getversion.outputs.version }}
+        run: |
+          ./gradlew build
+
+      - name: Stage JVM Distribution
+        if: inputs.build_version != ''
+        env:
+          VERSION: ${{ steps.getversion.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          # The plugin ships only as native binaries (see native-build.yaml +
+          # release.yaml); no main jar is published. The CycloneDX SBOM rides
+          # along so it gets attached to the GitHub release and to Maven
+          # Central via the `cyclonedx`-classified artifact on the publication.
+          cp build/reports/cyclonedx-direct/bom.json \
+            "staging/protoc-gen-mermaid-${VERSION}-cyclonedx.json"
+          ls -al staging
+
+      - name: Upload JVM Artifacts
+        if: inputs.build_version != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-jvm-jars
+          path: staging/*
+          if-no-files-found: error

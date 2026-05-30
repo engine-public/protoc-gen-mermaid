@@ -1,0 +1,137 @@
+---
+name: Native Build
+on:
+  workflow_call:
+    inputs:
+      build_version:
+        description: "The version to build.  It must be semver-compliant, and must not be for a tag that already exists."
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      build_version:
+        description: "Optional version string to embed in the build (defaults to 0.0.0-pre.0)."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - classifier: linux-x86_64
+            runs-on: ubuntu-latest
+          - classifier: linux-aarch_64
+            runs-on: ubuntu-24.04-arm
+          - classifier: osx-aarch_64
+            runs-on: macos-latest
+          - classifier: windows-x86_64
+            runs-on: windows-latest
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: 'true'
+          fetch-depth: 0
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@f744c72a42b1995d7b0cbc314bde4bace7ac1fe1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          native-image-job-reports: 'true'
+
+      # native-image's Gradle plugin calls Path.relativize between paths
+      # that must share a Windows drive root; otherwise it fails with
+      # "'other' has different root". setup-graalvm installs the JDK to C:
+      # and drops its options file under %TEMP% (also C:), but the workspace
+      # is on D:. Move the JDK, the options file, and TEMP/TMP to D: so
+      # everything shares a root.
+      - name: "Relocate GraalVM to D: drive (Windows)"
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          jdk_win='D:\graalvm'
+          jdk_unix='/d/graalvm'
+          [ -d "$jdk_unix" ] && rm -rf "$jdk_unix"
+          mv "$JAVA_HOME" "$jdk_unix"
+          echo "JAVA_HOME=$jdk_win" >> "$GITHUB_ENV"
+          echo "GRAALVM_HOME=$jdk_win" >> "$GITHUB_ENV"
+          echo "${jdk_win}\\bin" >> "$GITHUB_PATH"
+
+          # Pin TEMP/TMP to D: so native-image's intermediate paths stay on
+          # the same drive as the workspace (required by the buildtools
+          # plugin's Path.relativize calls).
+          tmp_win="${RUNNER_TEMP//\//\\}"
+          echo "TEMP=$tmp_win" >> "$GITHUB_ENV"
+          echo "TMP=$tmp_win" >> "$GITHUB_ENV"
+
+          if [ -n "${NATIVE_IMAGE_CONFIG_FILE:-}" ] && [ -f "$NATIVE_IMAGE_CONFIG_FILE" ]; then
+            cfg_dir_unix='/d/graalvm-config'
+            cfg_win='D:\graalvm-config\native-image-options.properties'
+            mkdir -p "$cfg_dir_unix"
+            mv "$NATIVE_IMAGE_CONFIG_FILE" "$cfg_dir_unix/native-image-options.properties"
+            echo "NATIVE_IMAGE_CONFIG_FILE=$cfg_win" >> "$GITHUB_ENV"
+
+            # setup-graalvm's post step looks for the build-output JSON at
+            # os.tmpdir()/native-image-build-output.json. Since we pinned
+            # TEMP to RUNNER_TEMP above, also rewrite the BuildOutputJSONFile
+            # path inside the moved options file so native-image writes the
+            # JSON where the post step will look for it. The file's content
+            # is a single Java property NativeImageArgs = ...; the only
+            # option setup-graalvm sets for this workflow is
+            # BuildOutputJSONFile, so rewrite the file in full.
+            escaped_temp="${RUNNER_TEMP//\\/\\\\}"
+            cat > "$cfg_dir_unix/native-image-options.properties" <<EOF
+          NativeImageArgs = -H:BuildOutputJSONFile=${escaped_temp}\\\\native-image-build-output.json
+          EOF
+          fi
+
+      - name: Setup gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # https://github.com/gradle/actions/releases/tag/v6.1.0
+
+      - name: Determine Build Version
+        env:
+          ENGINE_BUILD_VERSION: ${{ inputs.build_version }}
+        run: |
+          ./gradlew writeVersion
+
+      - name: Read Version File
+        id: getversion
+        shell: bash
+        run: |
+          test -f build/version.txt
+          echo "version=$(cat build/version.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Native Compile
+        env:
+          ENGINE_BUILD_VERSION: ${{ steps.getversion.outputs.version }}
+        run: |
+          ./gradlew :nativeCompile
+
+      - name: Stage Binary
+        shell: bash
+        env:
+          CLASSIFIER: ${{ matrix.classifier }}
+          VERSION: ${{ steps.getversion.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          src="build/native/nativeCompile/protoc-gen-mermaid-${CLASSIFIER}.exe"
+          test -f "$src" || { echo "expected native binary not found at $src"; ls -al build/native/nativeCompile; exit 1; }
+          cp "$src" "staging/protoc-gen-mermaid-${VERSION}-${CLASSIFIER}.exe"
+          ls -al staging
+
+      - name: Upload Native Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-native-${{ matrix.classifier }}
+          path: staging/*
+          if-no-files-found: error
