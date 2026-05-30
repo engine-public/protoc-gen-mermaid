@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.hierarchical;
+
+option java_package = "com.engine.protoc.mermaid.example.hierarchical";
+option java_multiple_files = true;
+
+// Exercises `hierarchicalNamespaces=true`: a multi-segment proto package gives Mermaid
+// something to draw as a nested cluster instead of the default flat namespace box.
+message Item {
+    string id = 1;
+}

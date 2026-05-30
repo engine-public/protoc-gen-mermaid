@@ -1,0 +1,20 @@
+---
+  title: "Complete schema: engine.protoc.mermaid.example.direction"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    direction LR
+    namespace engine.protoc.mermaid.example.direction {
+        class Parent {
+            Child child
+        }
+
+        class Child {
+            string id
+        }
+    }
+
+    Parent --> "0..1" Child : child

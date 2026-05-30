@@ -22,6 +22,12 @@ plugins {
 val suiteRecorderOptions =
     mapOf(
         "hello" to emptyList<String>(),
+        "hideEmptyMembersBox" to listOf("hideEmptyMembersBox=false"),
+        "hierarchicalNamespaces" to listOf("hierarchicalNamespaces=true"),
+        "suppressNamespaces" to listOf("suppressNamespaces=true"),
+        "suppressVisibility" to listOf("suppressVisibility=false"),
+        "suppressWellKnownTypes" to listOf("suppressWellKnownTypes=false"),
+        "direction" to listOf("direction=LR"),
     )
 
 dependencies {

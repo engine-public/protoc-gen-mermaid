@@ -1,0 +1,16 @@
+---
+  title: "File overview: suppress_well_known_types.proto"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.wkt {
+        class Event {
+            string id
+            Timestamp at
+        }
+    }
+
+    Event --> "0..1" Timestamp : at

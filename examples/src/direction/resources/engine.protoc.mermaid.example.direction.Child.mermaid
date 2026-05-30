@@ -1,0 +1,20 @@
+---
+  title: "Message: engine.protoc.mermaid.example.direction.Child"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    direction LR
+    namespace engine.protoc.mermaid.example.direction {
+        class Child {
+            string id
+        }
+
+        class Parent {
+            Child child
+        }
+    }
+
+    Parent --> "0..1" Child : child
