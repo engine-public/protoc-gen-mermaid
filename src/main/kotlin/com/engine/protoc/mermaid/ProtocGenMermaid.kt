@@ -1,5 +1,6 @@
 package com.engine.protoc.mermaid
 
+import com.engine.protoc.mermaid.compile.Compiler
 import com.engine.protoc.util.compiler.CodeGeneratorRequestWrapper
 import com.engine.protoc.util.compiler.Parameters
 import com.engine.protoc.util.extensions.wrap
@@ -44,8 +45,5 @@ public class ProtocGenMermaid(
         }
     }
 
-    public fun compile(): PluginProtos.CodeGeneratorResponse =
-        PluginProtos.CodeGeneratorResponse.newBuilder()
-            .setSupportedFeatures(PluginProtos.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL.number.toLong())
-            .build()
+    public fun compile(): PluginProtos.CodeGeneratorResponse = Compiler(request, options).compile()
 }

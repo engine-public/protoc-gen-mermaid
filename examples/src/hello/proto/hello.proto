@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.hello;
+
+option java_package = "com.engine.protoc.mermaid.example.hello";
+option java_multiple_files = true;
+
+// Minimal proto: one message and one service.  Runs the compiler at its defaults so the
+// generated fixtures act as a baseline for the per-option suites alongside this one.
+message Greeting {
+    string text = 1;
+}
+
+service Greeter {
+    rpc SayHello(Greeting) returns (Greeting);
+}
