@@ -21,30 +21,53 @@ import org.slf4j.LoggerFactory
 private val log = LoggerFactory.getLogger(Compiler::class.java)
 
 /**
- * Renders the in-scope schema as Mermaid `classDiagram` files.  Per compile invocation it emits a
- * file-overview diagram per proto, a focus diagram per message, and one complete-schema diagram.
- * Within every diagram, classes render identically: a class block per message (one `+<type> <name>`
- * line per field), a class block per enum (a `<<enumeration>>` annotation followed by one line per
- * value), and a class block per service (a `<<service>>` annotation followed by one
- * `RpcName(Request) Response` line per RPC, with a `stream` marker for client/server streaming).
+ * Per compile invocation, emits one or more `.mermaid` files based on
+ * [ProtocGenMermaid.Options.diagramTypes] — see [DiagramType] for what each kind produces and how
+ * its filename is formed.  Within every output file, classes are rendered identically: a class
+ * block per message (one `<type> <name>` line per field, gated by `suppressVisibility`), a class
+ * block per enum (a `<<enumeration>>` annotation followed by one line per value), and a class
+ * block per service (a `<<service>>` annotation followed by one `RpcName(Request) Response` line
+ * per RPC, with a `stream` marker on either side for client/server streaming RPCs).
  *
- * Association arrows (`Source --> "<card>" Target : fieldName`) are emitted for every message field
- * that references another message or enum, and dependency arrows (`Service ..> "1" Message : rpc`)
- * for every RPC's input and output.  Target-side cardinality follows protobuf's presence model:
- * repeated `*`; non-repeated message `0..1`; non-repeated enum/scalar `0..1` when explicitly
- * `optional`, else `1`; RPC inputs/outputs always `1`.  Repeated fields keep a `Type[]` suffix.
+ * Association arrows (`Source --> "<card>" Target : fieldName`) are emitted for every message
+ * field that references another message or enum, and dependency arrows (`Service ..> "1" Message
+ * : rpcName`) are emitted for every RPC's input and output.  The cardinality (always on the
+ * target side) follows protobuf's presence model: repeated fields are `*`; non-repeated
+ * message/group fields are always `0..1`; non-repeated enum/scalar fields are `0..1` when the
+ * field is explicitly `optional` (proto2's `optional` keyword or proto3's `proto3_optional` flag)
+ * and `1` otherwise; RPC inputs and outputs are always `1`.  Every repeated field — scalar or
+ * reference — also keeps a `Type[]` suffix in its field line, so multiplicity stays visible
+ * inside the class block at a glance even when the reader isn't tracing arrows.
  *
- * Nested message and enum types are flattened to siblings (preorder) and rendered with a
- * disambiguated identifier built from the containing-message chain joined with `_` (e.g.
- * `Outer_Inner`) plus a dotted display label (`["Outer.Inner"]`).  Top-level types keep their bare
- * leaf name.  Arrow endpoints use the identifier; field-line/RPC text uses the label.  Synthetic
- * map-entry messages are filtered out: a `map<K, V>` field renders as Mermaid generics `map~K, V~`
- * and its association arrow re-targets the value type.  The structural parent/child relationship is
- * drawn as a composition arrow `Parent *-- Child : nested`, and each nested message also gets its
- * own per-`MESSAGE` file (filename = parent FQN + `.` + leaf) that forcibly includes the parent.
+ * Nested message and enum types declared inside a message are flattened to siblings (depth-first
+ * preorder) and rendered with a *disambiguated* identifier built from the containing-message
+ * chain joined with `_` (e.g. `Outer_Inner`), together with a dotted display label
+ * (`["Outer.Inner"]`) so the rendered name still reads like the source-level dotted form.
+ * Top-level types keep their bare leaf name as both identifier and label.  All arrow endpoints
+ * use the identifier; the field-line type text and RPC method line text use the label.
+ * Synthetic map-entry messages (the `option map_entry = true` boilerplate the parser injects
+ * for `map<K, V>` fields) are filtered out everywhere — they never render as a class, and a map
+ * field renders as Mermaid generics `map~K, V~` (with no `[]` suffix) instead of `FooEntry[]`.
+ * The association arrow for a map field re-targets through to the value type:
+ * `map<string, Foo>` arrows at `Foo` with cardinality `*`, `map<string, string>` emits no arrow
+ * at all.  The structural parent/child relationship is drawn as a Mermaid composition arrow
+ * `Parent *-- Child : nested` wherever both endpoints appear in the same diagram; this is
+ * orthogonal to (and may sit alongside) the field-association arrow for a parent field that
+ * happens to be of the nested type.  Nested messages also get their own per-`MESSAGE` file
+ * (filename = parent FQN + `.` + leaf), and that file forcibly includes the direct parent class
+ * even when no field links them.
  *
- * `[deprecated = true]` messages/enums/services/values/fields are flagged — members with a trailing
- * `«deprecated»`, classes with a strikethrough `classDef` footer.
+ * Oneof groups are rendered per [OneofRenderingType].  In [OneofRenderingType.EMBEDDED] (default),
+ * oneof members are listed in the parent's class block under an `«oneof <name>»` stereotype header
+ * at the position the oneof appears in source, with `&nbsp;&nbsp;` indentation on each member line
+ * to visually group them.  In [OneofRenderingType.SEPARATE], each oneof is extracted into a
+ * pseudo-class identified `<Parent>_<oneofName>` (display label `<Parent>.<oneofName>`) with a
+ * `<<oneof>>` stereotype listing its member fields; the parent gains a composition arrow
+ * `Parent *-- "0..1" <pseudo> : <oneofName>` and the field-association arrows for those members
+ * originate from the pseudo-class.  Either way, oneof members get target-side cardinality `0..1`
+ * on their association arrows (the slot may hold none of them).  Synthetic single-field oneofs
+ * (the wrappers protobuf injects to represent proto3 `optional`) are filtered out so they don't
+ * render as headers or pseudo-classes — those fields render as regular fields.
  *
  * Not yet handled: documentation comments.
  */
@@ -72,20 +95,36 @@ internal class Compiler(
         if (DiagramType.MESSAGE in options.diagramTypes) {
             for (entry in messageEntries) response.addFile("${entry.fqn}.$outputExtension", render(messageDiagram(entry)))
         }
+        if (DiagramType.SERVICE in options.diagramTypes) {
+            for (svc in index.files.flatMap { it.services }) {
+                response.addFile("${index.fqnOf(svc)}.$outputExtension", render(serviceDiagram(svc)))
+            }
+        }
+        if (DiagramType.ENUMERATION in options.diagramTypes) {
+            for (enum in index.allEnums()) response.addFile("${index.fqnOf(enum)}.$outputExtension", render(enumerationDiagram(enum)))
+        }
         if (DiagramType.COMPLETE in options.diagramTypes) {
             response.addFile(completeFilename(), render(completeDiagram()))
+        }
+        if (DiagramType.PACKAGE in options.diagramTypes) {
+            for (pkg in distinctPackages()) response.addFile(packageFilename(pkg), render(packageDiagram(pkg)))
         }
         return response.build()
     }
 
     /**
      * Emits insertion-point entries targeting the `.md` files produced by protoc-gen-markdown in
-     * its `PER_FILE` mode.  Each diagram becomes one [PluginProtos.CodeGeneratorResponse.File] with
-     * `insertion_point` set; protoc splices the content in immediately before the matching
-     * `@@protoc_insertion_point(...)` marker.  FILE_OVERVIEW and MESSAGE diagrams target the
-     * per-file `.md` at `file_header_scope:<proto>` / `message_header_scope:<fqn>`; COMPLETE targets
-     * the root `overview.md` at the bare `file_header` point (which requires the markdown plugin's
-     * `includeIndices=true` so that navigation file exists).
+     * its `PER_FILE` mode.  Each diagram becomes one
+     * [PluginProtos.CodeGeneratorResponse.File] with `insertion_point` set; protoc itself splices
+     * the content in immediately before the matching `@@protoc_insertion_point(...)` marker.
+     *
+     * FILE_OVERVIEW and MESSAGE diagrams target the per-file `.md` (name = `<proto>` with the
+     * `.proto` suffix swapped for `.md`) at `file_header_scope:<proto>` and
+     * `message_header_scope:<fqn>` respectively.  COMPLETE targets the root `overview.md` at the
+     * bare `file_header` point, and PACKAGE targets each package-index file (named per
+     * [markdownPackageIndexFilename]) at its `file_header` point.  The latter two require the
+     * markdown plugin's `includeIndices=true` so those navigation files exist; absent them protoc
+     * rejects the response.
      */
     private fun compileEmbedded(): PluginProtos.CodeGeneratorResponse {
         val builder =
@@ -100,7 +139,7 @@ internal class Compiler(
                 builder.addFile(
                     PluginProtos.CodeGeneratorResponse.File.newBuilder()
                         .setName(hostMd)
-                        .setInsertionPoint("file_header_scope:$proto")
+                        .setInsertionPoint("${options.fileOverviewInsertionPoint}:$proto")
                         .setContent(render(overviewDiagram(file)))
                         .build(),
                 )
@@ -111,8 +150,30 @@ internal class Compiler(
                     builder.addFile(
                         PluginProtos.CodeGeneratorResponse.File.newBuilder()
                             .setName(hostMd)
-                            .setInsertionPoint("message_header_scope:${entry.fqn}")
+                            .setInsertionPoint("${options.messageInsertionPoint}:${entry.fqn}")
                             .setContent(render(messageDiagram(entry)))
+                            .build(),
+                    )
+                }
+            }
+            if (DiagramType.SERVICE in options.diagramTypes) {
+                for (svc in file.services) {
+                    builder.addFile(
+                        PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                            .setName(hostMd)
+                            .setInsertionPoint("${options.serviceInsertionPoint}:${index.fqnOf(svc)}")
+                            .setContent(render(serviceDiagram(svc)))
+                            .build(),
+                    )
+                }
+            }
+            if (DiagramType.ENUMERATION in options.diagramTypes) {
+                for (enum in index.enums(file)) {
+                    builder.addFile(
+                        PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                            .setName(hostMd)
+                            .setInsertionPoint("${options.enumerationInsertionPoint}:${index.fqnOf(enum)}")
+                            .setContent(render(enumerationDiagram(enum)))
                             .build(),
                     )
                 }
@@ -122,10 +183,22 @@ internal class Compiler(
             builder.addFile(
                 PluginProtos.CodeGeneratorResponse.File.newBuilder()
                     .setName("overview.md")
-                    .setInsertionPoint("file_header")
+                    .setInsertionPoint(options.completeInsertionPoint)
                     .setContent(render(completeDiagram()))
                     .build(),
             )
+        }
+        if (DiagramType.PACKAGE in options.diagramTypes) {
+            for (pkg in distinctPackages()) {
+                val pkgFiles = index.files.filter { index.packageOf(it) == pkg }
+                builder.addFile(
+                    PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                        .setName(markdownPackageIndexFilename(pkg, pkgFiles))
+                        .setInsertionPoint(options.packageInsertionPoint)
+                        .setContent(render(packageDiagram(pkg)))
+                        .build(),
+                )
+            }
         }
         return builder.build()
     }
@@ -166,11 +239,50 @@ internal class Compiler(
 
     private fun completeFilename(): String = (commonPackagePrefix().ifEmpty { "complete" }) + ".$outputExtension"
 
+    /**
+     * Standalone filename for a PACKAGE diagram: the dotted package (or `default` for the
+     * no-package group) followed by a `.package` leaf — the flattened form of the
+     * `<pkg-as-dir>/package.md` file protoc-gen-markdown emits.  The `.package` leaf keeps these
+     * from colliding with the COMPLETE file (`<common-prefix>.$ext`), which for a single-package
+     * scope would otherwise share the exact dotted name.
+     */
+    private fun packageFilename(pkg: String): String = (pkg.ifEmpty { "default" }) + ".package.$outputExtension"
+
+    /**
+     * Replicates protoc-gen-markdown's `packageGroup` filename rule so an embedded PACKAGE diagram
+     * lands on the `file_header` insertion point of the package-index doc that plugin emits: empty
+     * package → `default.md`; "namespaced" (every file declaring [pkg] lives at the directory
+     * `<pkg with . → />`) → `<pkg-as-dir>/package.md`; otherwise → `<pkg>.md`.  The `.md` extension
+     * is hardcoded — the target is the markdown plugin's own output file, not this plugin's.
+     */
+    private fun markdownPackageIndexFilename(
+        pkg: String,
+        pkgFiles: List<FileDescriptorProtoWrapper>,
+    ): String {
+        if (pkg.isEmpty()) return "default.md"
+        val pkgAsDir = pkg.replace('.', '/')
+        val namespaced =
+            pkgFiles.all { f ->
+                val name = f.name ?: return@all false
+                name.substringBeforeLast('/', missingDelimiterValue = "") == pkgAsDir
+            }
+        return if (namespaced) "$pkgAsDir/package.md" else "$pkg.md"
+    }
+
     private fun overviewTitle(file: FileDescriptorProtoWrapper): String = "File overview: ${file.name ?: "(unnamed)"}"
 
     private fun messageTitle(entry: MessageEntry): String = "Message: ${entry.fqn}"
 
     private fun completeTitle(): String = commonPackagePrefix().let { if (it.isEmpty()) "Complete schema" else "Complete schema: $it" }
+
+    private fun packageTitle(pkg: String): String = if (pkg.isEmpty()) "Package: (default)" else "Package: $pkg"
+
+    private fun serviceTitle(svc: ServiceDescriptorProtoWrapper): String = "Service: ${index.fqnOf(svc)}"
+
+    private fun enumerationTitle(enum: EnumDescriptorProtoWrapper): String = "Enum: ${index.fqnOf(enum)}"
+
+    /** Distinct package strings across scope files, in first-seen file order; `""` = the no-package group. */
+    private fun distinctPackages(): List<String> = index.files.map { index.packageOf(it) }.distinct()
 
     /** Longest dotted prefix shared by every scope file's package; `""` if none or no packages. */
     private fun commonPackagePrefix(): String {
@@ -204,6 +316,14 @@ internal class Compiler(
         val es = index.allEnums()
         val svs = index.files.flatMap { it.services }
         return Diagram(completeTitle(), es, ms, svs, fullArrows(ms, svs, es))
+    }
+
+    private fun packageDiagram(pkg: String): Diagram {
+        val pkgFiles = index.files.filter { index.packageOf(it) == pkg }
+        val ms = pkgFiles.flatMap { index.messages(it) }
+        val es = pkgFiles.flatMap { index.enums(it) }
+        val svs = pkgFiles.flatMap { it.services }
+        return Diagram(packageTitle(pkg), es, ms, svs, fullArrows(ms, svs, es))
     }
 
     private fun messageDiagram(entry: MessageEntry): Diagram {
@@ -269,7 +389,65 @@ internal class Compiler(
         return Diagram(messageTitle(entry), includedEnums, includedMessages, incomingServices, arrows)
     }
 
-    /** Every arrow for an overview/complete diagram: fields, then services, then nesting. */
+    /**
+     * One service in focus: the service's class block, a class block for every in-scope message it
+     * references via an RPC input or output (outgoing, one hop), and only the RPC dependency arrows
+     * for this service.  Services have no incoming references, and RPC input/output types are always
+     * messages (never enums), so neither an enum list nor an incoming side applies.
+     */
+    private fun serviceDiagram(svc: ServiceDescriptorProtoWrapper): Diagram {
+        val title = serviceTitle(svc)
+        if (svc.name?.value == null) {
+            return Diagram(title, emptyList(), emptyList(), emptyList(), emptyList())
+        }
+        val allMessages = index.allMessages()
+        val messagesById = allMessages.associateBy { index.refOf(it).id }
+
+        val targetIds =
+            svc.methods.flatMap { listOfNotNull(methodTargetId(it.inputType?.value), methodTargetId(it.outputType?.value)) }.toSet()
+        val includedMessages =
+            LinkedHashSet<DescriptorProtoWrapper>().apply { targetIds.forEach { messagesById[it]?.let(::add) } }.toList()
+        val included = includedIds(emptyList(), includedMessages)
+
+        val arrows = buildList {
+            addAll(serviceArrows(listOf(svc)))
+            addAll(oneofCompositionArrows(includedMessages))
+            addAll(nestingArrows(allMessages, included))
+        }
+        return Diagram(title, emptyList(), includedMessages, listOf(svc), arrows)
+    }
+
+    /**
+     * One enum in focus: the enum's class block, a class block for every in-scope message with a
+     * field referencing it (incoming, one hop), and only the field-association arrows that target
+     * the enum.  Enums have no outgoing references and cannot be referenced by RPCs; the parent of a
+     * nested enum is not forced in, since [nestingArrows] only draws message→message nesting.
+     */
+    private fun enumerationDiagram(enum: EnumDescriptorProtoWrapper): Diagram {
+        val title = enumerationTitle(enum)
+        if (enum.name?.value == null) {
+            return Diagram(title, emptyList(), emptyList(), emptyList(), emptyList())
+        }
+        val focusId = index.refOf(enum).id
+        val allMessages = index.allMessages()
+
+        val incomingMessages = allMessages.filter { msg -> msg.fields.any { fieldTargetId(msg, it) == focusId } }
+        val included = includedIds(listOf(enum), incomingMessages)
+
+        val arrows = buildList {
+            for (src in incomingMessages) {
+                for (field in src.fields) {
+                    if (fieldTargetId(src, field) != focusId) continue
+                    arrowOf(src, field)?.let(::add)
+                }
+            }
+            addAll(oneofCompositionArrows(incomingMessages))
+            addAll(nestingArrows(allMessages, included))
+        }
+        return Diagram(title, listOf(enum), incomingMessages, emptyList(), arrows)
+    }
+
+    /** Every arrow for a non-MESSAGE diagram: fields, then oneof composition, then services, then nesting. */
     private fun fullArrows(
         messages: List<DescriptorProtoWrapper>,
         services: List<ServiceDescriptorProtoWrapper>,
@@ -309,7 +487,9 @@ internal class Compiler(
     /**
      * Wraps a rendered Mermaid `classDiagram` body in a Markdown shell: an H1 heading derived from
      * the diagram's [title] followed by a blank line and a ` ```mermaid ` fenced code block
-     * containing [body] verbatim.
+     * containing [body] verbatim.  The fence preserves the diagram's YAML frontmatter and class
+     * body so any Mermaid-aware renderer (GitHub, IDEs, static-site generators) still sees a valid
+     * diagram inside.
      */
     private fun wrapMarkdown(
         title: String,
@@ -554,6 +734,13 @@ internal class Compiler(
         return if (field.label?.value == Label.LABEL_REPEATED) "$base[]" else base
     }
 
+    /**
+     * Bare field-line label: the dotted [TypeRef.label] for message/enum/group references (so
+     * nested types render visually disambiguated, e.g. `User.Address`), or the lowercased scalar
+     * (`int32`, `string`, …) for scalars.  Used by [fieldTypeLabel] for both the field itself
+     * and the K/V of a map entry.  Mermaid doesn't link the field-line type text to any class,
+     * so the dotted label is purely cosmetic — the arrow endpoint comes from [fieldTargetId].
+     */
     private fun scalarOrRefLabel(field: FieldDescriptorProtoWrapper): String =
         when (val t = field.type?.value) {
             Type.TYPE_MESSAGE, Type.TYPE_ENUM, Type.TYPE_GROUP -> typeLabel(field.typeName?.value)
@@ -598,8 +785,10 @@ internal class Compiler(
 
     /**
      * The Mermaid class identifier the arrow drawn from [field] should target: the message/enum
-     * referenced (re-targeted through to the value type for map fields), or null for scalars and
-     * scalar-valued maps.
+     * referenced (re-targeted through to the value type for map fields), or null for scalars,
+     * scalar-valued maps, and suppressed well-known types.  The in-class field-line *text* still
+     * shows the leaf name in all those cases via [fieldTypeLabel], so the schema info stays
+     * visible even when the arrow doesn't.
      */
     private fun fieldTargetId(
         msg: DescriptorProtoWrapper,
@@ -679,13 +868,13 @@ internal class Compiler(
             }
         }
 
-    // ===== Cardinality ===========================================================================
+    // ===== Cardinality, oneofs, arrow source =====================================================
 
     /**
      * Protobuf presence model encoded as a Mermaid target-side cardinality:
      *  - `*`     — any `repeated` field
      *  - `0..1`  — non-repeated message/group (always optional outside of RPCs)
-     *  - `0..1`  — non-repeated enum/scalar explicitly marked `optional`
+     *  - `0..1`  — non-repeated enum/scalar in a real (non-synthetic) oneof or explicitly `optional`
      *  - `1`     — non-repeated enum/scalar otherwise (proto2 `required`, proto3 implicit default)
      */
     private fun cardinality(

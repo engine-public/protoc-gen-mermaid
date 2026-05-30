@@ -1,0 +1,28 @@
+---
+  title: "Enum: engine.protoc.mermaid.example.enumeration.Shape.Style"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.enumeration {
+        class Shape_Style["Shape.Style"] {
+            <<enumeration>>
+            STYLE_UNSPECIFIED
+            STYLE_SOLID
+            STYLE_DASHED
+        }
+
+        class Palette {
+            Color primary
+            Shape.Style style
+        }
+
+        class Shape {
+            Shape.Style style
+        }
+    }
+
+    Palette --> "1" Shape_Style : style
+    Shape --> "1" Shape_Style : style

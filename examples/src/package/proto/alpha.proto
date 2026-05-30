@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.pkg.alpha;
+
+option java_package = "com.engine.protoc.mermaid.example.pkg.alpha";
+option java_multiple_files = true;
+
+// One half of the `diagramTypes=PACKAGE` example: this file declares package
+// `...pkg.alpha`.  PACKAGE mode emits one diagram per distinct package, so this
+// proto and `beta.proto` (a different package) land in two separate fixtures —
+// `...pkg.alpha.mermaid` and `...pkg.beta.mermaid` — making the per-package split
+// visible just by counting files.
+message Alpha {
+    string id = 1;
+}

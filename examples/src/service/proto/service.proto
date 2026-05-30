@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.service;
+
+option java_package = "com.engine.protoc.mermaid.example.service";
+option java_multiple_files = true;
+
+// Exercises `diagramTypes=SERVICE`: with the default (every DiagramType) this proto would
+// produce a FILE_OVERVIEW file, one MESSAGE file per message, one ENUMERATION file, a
+// COMPLETE file, and a PACKAGE file.  Restricting to SERVICE alone leaves only the per-service
+// focus diagram — the service class plus the messages it references via RPC input/output.
+message CreateUserRequest {
+    string name = 1;
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message User {
+    string id = 1;
+    string name = 2;
+}
+
+service UserService {
+    rpc CreateUser(CreateUserRequest) returns (User);
+    rpc GetUser(GetUserRequest) returns (User);
+}

@@ -1,0 +1,23 @@
+
+```mermaid
+---
+  title: "Message: engine.protoc.mermaid.example.serviceInsertionPoint.PingResponse"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.serviceInsertionPoint {
+        class PingResponse {
+            string message
+        }
+
+        class PingService {
+            <<service>>
+            Ping(PingRequest) PingResponse
+        }
+    }
+
+    PingService ..> "1" PingResponse : Ping
+```

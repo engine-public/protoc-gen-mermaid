@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.enumeration;
+
+option java_package = "com.engine.protoc.mermaid.example.enumeration";
+option java_multiple_files = true;
+
+// Exercises `diagramTypes=ENUMERATION`: one ENUMERATION focus diagram per enum, top-level or
+// nested.  `Color` is top-level; `Shape.Style` is nested inside `Shape`, so its fixture exercises
+// the disambiguated `Shape.Style` label / fully-qualified-name path.  Each enum is referenced by a
+// message field, so each focus diagram pulls in its incoming referencer.
+enum Color {
+    COLOR_UNSPECIFIED = 0;
+    COLOR_RED = 1;
+    COLOR_GREEN = 2;
+}
+
+message Palette {
+    Color primary = 1;
+    Shape.Style style = 2;
+}
+
+message Shape {
+    enum Style {
+        STYLE_UNSPECIFIED = 0;
+        STYLE_SOLID = 1;
+        STYLE_DASHED = 2;
+    }
+
+    Style style = 1;
+}

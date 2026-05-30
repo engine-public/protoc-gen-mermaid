@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.messageInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.messageInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `messageInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: each MESSAGE diagram lands
+// on `custom_message_scope:<fqn>` instead of the default `message_header_scope:<fqn>`.  The compiler
+// still appends the runtime `:<fqn>` scope — only the prefix is overridden.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}

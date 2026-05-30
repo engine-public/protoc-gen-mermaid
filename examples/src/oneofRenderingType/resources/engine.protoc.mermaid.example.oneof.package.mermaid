@@ -1,0 +1,21 @@
+---
+  title: "Package: engine.protoc.mermaid.example.oneof"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.oneof {
+        class Choice {
+            string id
+        }
+
+        class Choice_selector["Choice.selector"] {
+            <<oneof>>
+            string by_name
+            int32 by_id
+        }
+    }
+
+    Choice *-- "0..1" Choice_selector : selector
