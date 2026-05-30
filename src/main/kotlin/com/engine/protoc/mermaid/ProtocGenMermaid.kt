@@ -11,12 +11,14 @@ import org.apache.logging.log4j.core.config.Configurator
 import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory
 import org.slf4j.event.Level
 import java.io.InputStream
+import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
 import org.apache.logging.log4j.Level as Log4jLevel
 
 public class ProtocGenMermaid(
     private val request: CodeGeneratorRequestWrapper,
     private val options: Options,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
 
     /**
@@ -435,12 +437,13 @@ public class ProtocGenMermaid(
         public fun from(
             input: InputStream,
             registry: ExtensionRegistry = ExtensionRegistry.newInstance(),
+            clock: Clock = Clock.systemUTC(),
             block: Options.Builder.() -> Unit = {},
         ): ProtocGenMermaid {
             val cgreq = PluginProtos.CodeGeneratorRequest.parseFrom(input, registry).wrap()
             val options = Options.Builder.from(cgreq.parameters).apply(block).build()
             applyLoggingConfiguration(options)
-            return ProtocGenMermaid(cgreq, options)
+            return ProtocGenMermaid(cgreq, options, clock)
         }
 
         /**
@@ -518,5 +521,5 @@ public class ProtocGenMermaid(
             }
     }
 
-    public fun compile(): PluginProtos.CodeGeneratorResponse = Compiler(request, options).compile()
+    public fun compile(): PluginProtos.CodeGeneratorResponse = Compiler(request, options, clock).compile()
 }

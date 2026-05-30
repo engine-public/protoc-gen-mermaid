@@ -4,6 +4,9 @@ import com.engine.protoc.mermaid.ProtocGenMermaid
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import java.io.File
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 /**
  * Shared dev-tool spec for every example suite.  Runs the compiler over the suite's recorded
@@ -15,12 +18,16 @@ import java.io.File
  *
  * Out path is resolved via the `dumpDir` system property (wired by `examples/build.gradle.kts`)
  * so this works regardless of the test task's working directory.
+ *
+ * The compiler is invoked with a pinned [Clock] ([FIXTURE_CLOCK]) so the
+ * `protoc-gen-mermaid-generated-on` frontmatter key holds a stable instant; otherwise every
+ * regeneration would churn the committed fixtures with a fresh wall-clock timestamp.
  */
 public abstract class Dumper :
     FunSpec({
         test("dump diagrams into the suite's resources directory") {
             val req = Dumper::class.java.getResourceAsStream("/code-generator-request.binpb").shouldNotBeNull()
-            val response = ProtocGenMermaid.from(req).compile()
+            val response = ProtocGenMermaid.from(req, clock = FIXTURE_CLOCK).compile()
             val outDir = File(System.getProperty("dumpDir") ?: "src/test/resources").also { it.mkdirs() }
             for (file in response.fileList) {
                 /*
@@ -40,4 +47,9 @@ public abstract class Dumper :
                 File(outDir, target).writeText(file.content)
             }
         }
-    })
+    }) {
+    public companion object {
+        /** Pinned generation instant so committed fixtures don't churn on every regeneration. */
+        public val FIXTURE_CLOCK: Clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)
+    }
+}
