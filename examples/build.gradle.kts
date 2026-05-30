@@ -30,6 +30,8 @@ val suiteRecorderOptions =
         "direction" to listOf("direction=LR"),
         "diagramTypes" to listOf("diagramTypes=COMPLETE"),
         "oneofRenderingType" to listOf("oneofRenderingType=SEPARATE"),
+        "outputType" to listOf("outputType=STANDALONE_MARKDOWN"),
+        "embeddedMarkdown" to listOf("outputType=EMBEDDED_MARKDOWN"),
     )
 
 dependencies {

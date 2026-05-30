@@ -4,6 +4,7 @@ import com.engine.protoc.mermaid.ProtocGenMermaid
 import com.engine.protoc.mermaid.ProtocGenMermaid.Options.DiagramType
 import com.engine.protoc.mermaid.ProtocGenMermaid.Options.Direction
 import com.engine.protoc.mermaid.ProtocGenMermaid.Options.OneofRenderingType
+import com.engine.protoc.mermaid.ProtocGenMermaid.Options.OutputType
 import com.engine.protoc.util.SyntaxElement
 import com.engine.protoc.util.compiler.CodeGeneratorRequestWrapper
 import com.engine.protoc.util.compiler.CodeGeneratorResponseWrapper
@@ -54,18 +55,87 @@ internal class Compiler(
 
     internal fun compile(): PluginProtos.CodeGeneratorResponse {
         log.info("compile starting with options: {}", options)
+        return when (options.outputType) {
+            OutputType.STANDALONE_MERMAID,
+            OutputType.STANDALONE_MARKDOWN,
+            -> compileStandalone()
+
+            OutputType.EMBEDDED_MARKDOWN -> compileEmbedded()
+        }
+    }
+
+    private fun compileStandalone(): PluginProtos.CodeGeneratorResponse {
         val response = CodeGeneratorResponseWrapper()
         if (DiagramType.FILE_OVERVIEW in options.diagramTypes) {
             for (file in index.files) response.addFile(overviewFilename(file), render(overviewDiagram(file)))
         }
         if (DiagramType.MESSAGE in options.diagramTypes) {
-            for (entry in messageEntries) response.addFile("${entry.fqn}.mermaid", render(messageDiagram(entry)))
+            for (entry in messageEntries) response.addFile("${entry.fqn}.$outputExtension", render(messageDiagram(entry)))
         }
         if (DiagramType.COMPLETE in options.diagramTypes) {
             response.addFile(completeFilename(), render(completeDiagram()))
         }
         return response.build()
     }
+
+    /**
+     * Emits insertion-point entries targeting the `.md` files produced by protoc-gen-markdown in
+     * its `PER_FILE` mode.  Each diagram becomes one [PluginProtos.CodeGeneratorResponse.File] with
+     * `insertion_point` set; protoc splices the content in immediately before the matching
+     * `@@protoc_insertion_point(...)` marker.  FILE_OVERVIEW and MESSAGE diagrams target the
+     * per-file `.md` at `file_header_scope:<proto>` / `message_header_scope:<fqn>`; COMPLETE targets
+     * the root `overview.md` at the bare `file_header` point (which requires the markdown plugin's
+     * `includeIndices=true` so that navigation file exists).
+     */
+    private fun compileEmbedded(): PluginProtos.CodeGeneratorResponse {
+        val builder =
+            PluginProtos.CodeGeneratorResponse.newBuilder()
+                .setSupportedFeatures(
+                    PluginProtos.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL.number.toLong(),
+                )
+        for (file in index.files) {
+            val proto = file.name ?: continue
+            val hostMd = proto.removeSuffix(".proto") + ".md"
+            if (DiagramType.FILE_OVERVIEW in options.diagramTypes) {
+                builder.addFile(
+                    PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                        .setName(hostMd)
+                        .setInsertionPoint("file_header_scope:$proto")
+                        .setContent(render(overviewDiagram(file)))
+                        .build(),
+                )
+            }
+            if (DiagramType.MESSAGE in options.diagramTypes) {
+                for (msg in index.messages(file)) {
+                    val entry = MessageEntry(msg, index.fqnOf(msg), index.parentOf(msg))
+                    builder.addFile(
+                        PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                            .setName(hostMd)
+                            .setInsertionPoint("message_header_scope:${entry.fqn}")
+                            .setContent(render(messageDiagram(entry)))
+                            .build(),
+                    )
+                }
+            }
+        }
+        if (DiagramType.COMPLETE in options.diagramTypes) {
+            builder.addFile(
+                PluginProtos.CodeGeneratorResponse.File.newBuilder()
+                    .setName("overview.md")
+                    .setInsertionPoint("file_header")
+                    .setContent(render(completeDiagram()))
+                    .build(),
+            )
+        }
+        return builder.build()
+    }
+
+    /** File extension derived from [OutputType]: `mermaid` for bare diagrams, `md` for markdown shapes. */
+    private val outputExtension: String =
+        when (options.outputType) {
+            OutputType.STANDALONE_MERMAID -> "mermaid"
+            OutputType.STANDALONE_MARKDOWN, OutputType.EMBEDDED_MARKDOWN -> "md"
+        }
 
     // ===== Scope index ===========================================================================
 
@@ -91,10 +161,10 @@ internal class Compiler(
     private fun overviewFilename(file: FileDescriptorProtoWrapper): String {
         val basename = (file.name ?: "").substringAfterLast('/').removeSuffix(".proto")
         val pkg = index.packageOf(file).takeIf(String::isNotEmpty)
-        return if (pkg == null) "$basename.mermaid" else "$pkg.$basename.mermaid"
+        return if (pkg == null) "$basename.$outputExtension" else "$pkg.$basename.$outputExtension"
     }
 
-    private fun completeFilename(): String = (commonPackagePrefix().ifEmpty { "complete" }) + ".mermaid"
+    private fun completeFilename(): String = (commonPackagePrefix().ifEmpty { "complete" }) + ".$outputExtension"
 
     private fun overviewTitle(file: FileDescriptorProtoWrapper): String = "File overview: ${file.name ?: "(unnamed)"}"
 
@@ -219,14 +289,53 @@ internal class Compiler(
 
     // ===== Render pipeline =======================================================================
 
-    private fun render(d: Diagram): String =
+    private fun render(d: Diagram): String {
+        val body =
+            buildString {
+                appendFrontmatter(d.title)
+                appendLine("classDiagram")
+                if (options.direction != Direction.TB) appendLine("    direction ${options.direction.name}")
+                appendTypes(d.enums, d.messages, d.services)
+                appendArrows(d.arrows)
+                appendFooter(deprecatedClassIds(d))
+            }
+        return when (options.outputType) {
+            OutputType.STANDALONE_MERMAID -> body
+            OutputType.STANDALONE_MARKDOWN -> wrapMarkdown(d.title, body)
+            OutputType.EMBEDDED_MARKDOWN -> wrapEmbedded(body)
+        }
+    }
+
+    /**
+     * Wraps a rendered Mermaid `classDiagram` body in a Markdown shell: an H1 heading derived from
+     * the diagram's [title] followed by a blank line and a ` ```mermaid ` fenced code block
+     * containing [body] verbatim.
+     */
+    private fun wrapMarkdown(
+        title: String,
+        body: String,
+    ): String =
         buildString {
-            appendFrontmatter(d.title)
-            appendLine("classDiagram")
-            if (options.direction != Direction.TB) appendLine("    direction ${options.direction.name}")
-            appendTypes(d.enums, d.messages, d.services)
-            appendArrows(d.arrows)
-            appendFooter(deprecatedClassIds(d))
+            appendLine("# $title")
+            appendLine()
+            appendLine("```mermaid")
+            append(body)
+            if (!body.endsWith('\n')) appendLine()
+            appendLine("```")
+        }
+
+    /**
+     * Wraps a rendered Mermaid `classDiagram` body in a bare fenced ` ```mermaid ` block with a
+     * leading blank line.  Used by [OutputType.EMBEDDED_MARKDOWN] where the host markdown's own
+     * section heading sits directly above the insertion point, so no extra title is added here.
+     */
+    private fun wrapEmbedded(body: String): String =
+        buildString {
+            appendLine()
+            appendLine("```mermaid")
+            append(body)
+            if (!body.endsWith('\n')) appendLine()
+            appendLine("```")
         }
 
     private fun StringBuilder.appendFrontmatter(title: String) {

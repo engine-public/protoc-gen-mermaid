@@ -84,6 +84,18 @@ public class ProtocGenMermaid(
          */
         public val oneofRenderingType: OneofRenderingType,
         /**
+         * Shape of each emitted artifact.  See [OutputType] for the available values; default is
+         * [OutputType.STANDALONE_MERMAID] (a bare Mermaid `classDiagram` written to a `.mermaid`
+         * file, the original plugin behavior).  Selecting [OutputType.STANDALONE_MARKDOWN] switches
+         * the file extension to `.md` and wraps the same diagram body in a fenced ` ```mermaid `
+         * code block prefixed by a Markdown `# <title>` heading, so the artifact drops directly
+         * into long-form documentation without further wrapping.  Selecting
+         * [OutputType.EMBEDDED_MARKDOWN] emits the diagrams as protoc insertion-point entries
+         * targeting the `.md` files produced by `protoc-gen-markdown`, splicing each fenced
+         * diagram into the host markdown directly under the relevant heading.
+         */
+        public val outputType: OutputType,
+        /**
          * When true (default), protobuf well-known types (anything under the `google.protobuf.*`
          * namespace — `Timestamp`, `Duration`, `Any`, `Empty`, `Struct`, `FieldMask`, `Value`,
          * the `*Value` wrappers, etc.) are suppressed from the relationship graph: no class block,
@@ -186,6 +198,36 @@ public class ProtocGenMermaid(
         }
 
         /**
+         * Artifact-shape taxonomy.  Selects the file extension and the surrounding wrapper that
+         * the compiler emits around each diagram.  Add a new value here, then handle it in
+         * [com.engine.protoc.mermaid.compile.Compiler] where the output extension and rendered
+         * content are assembled.
+         */
+        public enum class OutputType {
+            /**
+             * One `.mermaid` file per diagram, containing nothing but the Mermaid `classDiagram`
+             * (YAML frontmatter + body).  The original plugin behavior; default.
+             */
+            STANDALONE_MERMAID,
+
+            /**
+             * One `.md` file per diagram, wrapping the exact same `classDiagram` content in a
+             * fenced ` ```mermaid ` code block prefixed by a Markdown `# <title>` heading derived
+             * from the diagram's title.  Suitable for dropping directly into documentation
+             * (GitHub, IDEs, static-site generators) without further wrapping.
+             */
+            STANDALONE_MARKDOWN,
+
+            /**
+             * Diagram content emitted as protoc insertion-point entries that splice into the
+             * `.md` files produced by protoc-gen-markdown (its `PER_FILE` mode, the default).
+             * Content is a fenced ` ```mermaid ` code block with no surrounding heading — the host
+             * markdown already supplies the section header directly above the insertion point.
+             */
+            EMBEDDED_MARKDOWN,
+        }
+
+        /**
          * Layout-flow taxonomy mirroring Mermaid's `direction` directive.  The four cardinal
          * options correspond directly to the strings Mermaid accepts inside a `classDiagram` body.
          */
@@ -219,6 +261,9 @@ public class ProtocGenMermaid(
             public var oneofRenderingType: OneofRenderingType =
                 parameters.get<OneofRenderingType>("oneofRenderingType") ?: OneofRenderingType.EMBEDDED
 
+            public var outputType: OutputType =
+                parameters.get<OutputType>("outputType") ?: OutputType.STANDALONE_MERMAID
+
             public var suppressWellKnownTypes: Boolean = parameters.get<Boolean>("suppressWellKnownTypes") ?: true
 
             public var direction: Direction = parameters.get<Direction>("direction") ?: Direction.TB
@@ -239,6 +284,7 @@ public class ProtocGenMermaid(
                     suppressVisibility = suppressVisibility,
                     diagramTypes = diagramTypes,
                     oneofRenderingType = oneofRenderingType,
+                    outputType = outputType,
                     suppressWellKnownTypes = suppressWellKnownTypes,
                     direction = direction,
                     logLevel = logLevel,

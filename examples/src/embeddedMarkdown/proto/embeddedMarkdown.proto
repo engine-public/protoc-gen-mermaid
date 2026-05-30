@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.embeddedMarkdown;
+
+option java_package = "com.engine.protoc.mermaid.example.embeddedMarkdown";
+option java_multiple_files = true;
+
+// Exercises `outputType=EMBEDDED_MARKDOWN`: each diagram is emitted as a protoc
+// insertion-point entry that targets the `.md` file protoc-gen-markdown would produce
+// for this proto (its PER_FILE mode).  FILE_OVERVIEW lands at `file_header_scope:<proto>`,
+// per-message diagrams at `message_header_scope:<fqn>`, per-service diagrams at
+// `service_header_scope:<fqn>`, and per-enum diagrams at `enum_header_scope:<fqn>` — the
+// `_header_scope` variants place the diagram immediately under the host markdown's section
+// heading.  Including a service and an enum here lets the end-to-end splice check
+// (`verifyEmbeddedMarkdownEndToEnd`) prove those two markers exist in protoc-gen-markdown's
+// output: a missing marker would make protoc fail the whole run.
+message Parent {
+    Child child = 1;
+    Status status = 2;
+}
+
+message Child {
+    string id = 1;
+}
+
+enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_ACTIVE = 1;
+}
+
+service ParentService {
+    rpc GetParent(Child) returns (Parent);
+}
