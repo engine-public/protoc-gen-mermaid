@@ -37,7 +37,7 @@ public abstract class Dumper :
                     } else {
                         file.name
                     }
-                File(outDir, target).writeText(file.content)
+                File(outDir, target).apply { parentFile?.mkdirs() }.writeText(file.content)
             }
         }
     })
