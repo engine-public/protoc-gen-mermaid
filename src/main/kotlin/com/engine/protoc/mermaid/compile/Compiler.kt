@@ -188,7 +188,14 @@ internal class Compiler(
                     if (methodTargetId(m.outputType?.value) == focusId) add("$svcName ..> \"1\" $focusId : $mname")
                 }
             }
-            addAll(oneofCompositionArrows(listOf(focus) + incomingMessages))
+            /*
+             * Composition arrows for every message rendered in this diagram — not just
+             * focus + incoming.  `renderMessage` emits a oneof pseudo-class for each real
+             * oneof on any included message (outgoing field targets, the forced parent, …),
+             * so the matching `Parent *-- "0..1" Parent.<oneof>` arrow has to be drawn for all
+             * of them or those pseudo-classes float unconnected.
+             */
+            addAll(oneofCompositionArrows(includedMessages))
             addAll(nestingArrows(allMessages, included))
         }
 

@@ -1,5 +1,5 @@
 ---
-  title: "Complete schema: engine.protoc.mermaid.example.oneof"
+  title: "Message: engine.protoc.mermaid.example.oneof.Detail"
   config:
     class:
       hideEmptyMembersBox: true
@@ -7,6 +7,13 @@
 ---
 classDiagram
     namespace engine.protoc.mermaid.example.oneof {
+        class Detail
+
+        class Detail_kind["Detail.kind"] {
+            <<oneof>>
+            string note
+        }
+
         class Choice {
             string id
             Detail detail
@@ -17,15 +24,8 @@ classDiagram
             string by_name
             int32 by_id
         }
-
-        class Detail
-
-        class Detail_kind["Detail.kind"] {
-            <<oneof>>
-            string note
-        }
     }
 
     Choice --> "0..1" Detail : detail
-    Choice *-- "0..1" Choice_selector : selector
     Detail *-- "0..1" Detail_kind : kind
+    Choice *-- "0..1" Choice_selector : selector
