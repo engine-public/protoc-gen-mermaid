@@ -1,0 +1,17 @@
+---
+  title: "Message: engine.protoc.mermaid.example.hello.Greeting"
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.hello {
+        class Greeting {
+            +string text
+        }
+
+        class Greeter {
+            <<service>>
+            SayHello(Greeting) Greeting
+        }
+    }
+
+    Greeter ..> "1" Greeting : SayHello
+    Greeter ..> "1" Greeting : SayHello
