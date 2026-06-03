@@ -3,21 +3,45 @@ kotlin = "2.3.20"
 protobuf = "4.34.1"
 kotest = "6.1.4"
 engine-protoc-utils = "1.0.1"
+graalvm-sdk = "23.1.2"
+log4j = "2.26.0"
+slf4j = "2.0.17"
 
 # plugin versions
+google-osdetector-plugin = "1.7.3"
+google-protobuf-plugin = "0.9.6"
+graalvm-native-plugin = "0.11.0"
 jlleitschuh-ktlint-plugin = "14.2.0"
+jreleaser-plugin = "1.24.0"
+cyclonedx = "3.2.4"
+jk1-dependency-license-report = "2.9"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "jlleitschuh-ktlint-plugin" }
+protobuf = { id = "com.google.protobuf", version.ref = "google-protobuf-plugin" }
+osdetector = { id = "com.google.osdetector", version.ref = "google-osdetector-plugin" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native-plugin" }
+jreleaser = { id = "org.jreleaser", version.ref = "jreleaser-plugin" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
+license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "jk1-dependency-license-report" }
 
 [libraries]
 engine-protoc-utils = { group = "com.engine", name = "protoc-utils", version.ref = "engine-protoc-utils" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protobuf" }
+graalvm-sdk = { group = "org.graalvm.sdk", name = "graal-sdk", version.ref = "graalvm-sdk" }
+log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
+log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
+log4j-slf4j2-impl = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 
 # test dependencies
 test-kotest-assertions-core = { group = "io.kotest", name = "kotest-assertions-core", version.ref = "kotest" }
 test-kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
+
+# build tool dependencies
+tools-protoc-compiler = { group = "com.google.protobuf", name = "protoc", version.ref = "protobuf" }
+tools-protoc-recorder = { group = "com.engine", name = "protoc-utils-recorder", version.ref = "engine-protoc-utils" }
 
 [bundles]
 test-kotest = ["test-kotest-assertions-core", "test-kotest-runner-junit5"]
