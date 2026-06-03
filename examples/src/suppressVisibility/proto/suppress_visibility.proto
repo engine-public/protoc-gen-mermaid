@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.suppressvis;
+
+option java_package = "com.engine.protoc.mermaid.example.suppressvis";
+option java_multiple_files = true;
+
+// Exercises `suppressVisibility=false`: each field line is prefixed with Mermaid's `+`
+// (public) glyph instead of the bare `<type> <name>` form the compiler emits by default.
+message Item {
+    string name = 1;
+    int32 quantity = 2;
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.wkt;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.engine.protoc.mermaid.example.wkt";
+option java_multiple_files = true;
+
+// Exercises `suppressWellKnownTypes=false`: a field of type `google.protobuf.Timestamp`
+// renders as a regular reference — an arrow into an implicitly-created blank class block
+// — instead of being elided from the relationship graph the way the compiler does by
+// default for `google.protobuf.*` types.
+message Event {
+    string id = 1;
+    google.protobuf.Timestamp at = 2;
+}

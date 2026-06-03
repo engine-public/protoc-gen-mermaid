@@ -16,18 +16,119 @@ public class ProtocGenMermaid(
     /**
      * Options that influence the compiler plugin.
      *
-     * No options are defined yet.  Add new options as properties here, then wire each one through
-     * [Builder] so it can be parsed from the `--mermaid_out=key=value,…:outdir` parameter string.
+     * Add new options as properties here, then wire each one through [Builder] so it can be parsed
+     * from the `--mermaid_out=key=value,…:outdir` parameter string.
      */
-    public class Options private constructor() {
+    public data class Options(
+        /**
+         * When true, each generated `.mermaid` file is prefixed with a YAML config frontmatter
+         * block that sets `config.class.hideEmptyMembersBox: true`, telling Mermaid to suppress
+         * the empty attribute/method compartment on classes that declare no members.  Default
+         * true — most proto descriptors include at least one field, but a message with none
+         * renders as a single titled box rather than a stack of empty compartments.
+         *
+         * Note: this option is currently non-functional in mermaid 11.15.0 such that it
+         * doesn't hide fields or methods if either have at least one item. See
+         * https://github.com/mermaid-js/mermaid/issues/6192
+         */
+        public val hideEmptyMembersBox: Boolean,
+        /**
+         * Forwarded to Mermaid's `config.class.hierarchicalNamespaces` option.  Mermaid wraps every
+         * generated `classDiagram` body in `namespace <proto-package> { ... }` (the proto file's
+         * dotted package becomes Mermaid's hierarchical namespace name).  With this option true
+         * (Mermaid's default), each dot-segment of the package renders as its own nested cluster.
+         * With it false, Mermaid switches to "compact mode" and draws a single flat box for the
+         * declared namespace, skipping the auto-created intermediate ancestors.  Default false —
+         * the plugin opts out of Mermaid's hierarchical mode by default because the rendered
+         * stack of single-segment clusters is visually noisy for typical proto packages.
+         *
+         * Because Mermaid's own default is `true`, this is only emitted into the output's YAML
+         * frontmatter when the value is `false` (i.e. the plugin's default), opting into compact
+         * mode.  Pass `hierarchicalNamespaces=true` to fall back to Mermaid's hierarchical mode;
+         * in that case nothing is emitted into the frontmatter.
+         */
+        public val hierarchicalNamespaces: Boolean,
+        /**
+         * When true, the compiler does not wrap a proto file's messages in a `namespace { ... }`
+         * block, regardless of the file's `package` declaration.  Useful when the rendered diagram
+         * is part of documentation that already establishes the package context (e.g. an embed in
+         * a per-package README), so the extra namespace cluster is noise.  Default false — the
+         * proto package is preserved as a Mermaid namespace.
+         */
+        public val suppressNamespaces: Boolean,
+        /**
+         * When true, field lines are emitted as `<type> <name>` with no leading visibility marker.
+         * When false, each field is rendered as `+<type> <name>` — Mermaid's `+` (public) glyph,
+         * matching UML attribute conventions.  Default true: protobuf has no field-level visibility
+         * concept, so the universal `+` adds noise without conveying anything.
+         */
+        public val suppressVisibility: Boolean,
+        /**
+         * When true (default), protobuf well-known types (anything under the `google.protobuf.*`
+         * namespace — `Timestamp`, `Duration`, `Any`, `Empty`, `Struct`, `FieldMask`, `Value`,
+         * the `*Value` wrappers, etc.) are suppressed from the relationship graph: no class block,
+         * no association arrow from a field referring to one, no dependency arrow from an RPC
+         * accepting or returning one.  The in-class field line still reads `Timestamp created_at`
+         * and the RPC method line still reads `Foo(Empty) Empty`, so the schema information is
+         * preserved while the visual noise of dangling WKT boxes is removed.  Set false to render
+         * WKTs the same as any other referenced type (which, since they are almost always imported
+         * rather than generated, means an arrow into an implicitly-created blank class block).
+         */
+        public val suppressWellKnownTypes: Boolean,
+        /**
+         * Layout direction passed through to Mermaid as a body-level `direction <value>` statement
+         * inside the `classDiagram` block.  See [Direction] for the four cardinal options.  Default
+         * is [Direction.TB] (top → bottom), which matches Mermaid's own default; in that case no
+         * `direction` line is emitted into the output.  Any other value is emitted verbatim.
+         */
+        public val direction: Direction,
+    ) {
 
-        public class Builder private constructor(@Suppress("UNUSED_PARAMETER") parameters: Parameters) {
+        /**
+         * Layout-flow taxonomy mirroring Mermaid's `direction` directive.  The four cardinal
+         * options correspond directly to the strings Mermaid accepts inside a `classDiagram` body.
+         */
+        public enum class Direction {
+            /** Left → right. */
+            LR,
+
+            /** Right → left. */
+            RL,
+
+            /** Top → bottom.  Mermaid's own default; the compiler omits the `direction` line in this case. */
+            TB,
+
+            /** Bottom → top. */
+            BT,
+        }
+
+        public class Builder private constructor(parameters: Parameters) {
+
+            public var hideEmptyMembersBox: Boolean = parameters.get<Boolean>("hideEmptyMembersBox") ?: true
+
+            public var hierarchicalNamespaces: Boolean = parameters.get<Boolean>("hierarchicalNamespaces") ?: false
+
+            public var suppressNamespaces: Boolean = parameters.get<Boolean>("suppressNamespaces") ?: false
+
+            public var suppressVisibility: Boolean = parameters.get<Boolean>("suppressVisibility") ?: true
+
+            public var suppressWellKnownTypes: Boolean = parameters.get<Boolean>("suppressWellKnownTypes") ?: true
+
+            public var direction: Direction = parameters.get<Direction>("direction") ?: Direction.TB
 
             public companion object {
                 public fun from(parameters: Parameters): Builder = Builder(parameters)
             }
 
-            public fun build(): Options = Options()
+            public fun build(): Options =
+                Options(
+                    hideEmptyMembersBox = hideEmptyMembersBox,
+                    hierarchicalNamespaces = hierarchicalNamespaces,
+                    suppressNamespaces = suppressNamespaces,
+                    suppressVisibility = suppressVisibility,
+                    suppressWellKnownTypes = suppressWellKnownTypes,
+                    direction = direction,
+                )
         }
     }
 

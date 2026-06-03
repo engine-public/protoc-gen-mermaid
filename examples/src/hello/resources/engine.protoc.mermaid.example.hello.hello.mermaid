@@ -1,10 +1,14 @@
 ---
   title: "File overview: hello.proto"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
 ---
 classDiagram
     namespace engine.protoc.mermaid.example.hello {
         class Greeting {
-            +string text
+            string text
         }
 
         class Greeter {

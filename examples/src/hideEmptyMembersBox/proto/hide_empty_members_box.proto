@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.hideemptymembersbox;
+
+option java_package = "com.engine.protoc.mermaid.example.hideemptymembersbox";
+option java_multiple_files = true;
+
+// Exercises `hideEmptyMembersBox=false`: contrasts a field-less message (which would
+// otherwise collapse to a single titled box) with one that has fields.  Flipping the
+// option off restores Mermaid's default behavior — every class renders its empty
+// attribute/method compartments.
+message Empty {}
+
+message HasFields {
+    string id = 1;
+}

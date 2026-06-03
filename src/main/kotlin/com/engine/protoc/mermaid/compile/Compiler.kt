@@ -1,6 +1,7 @@
 package com.engine.protoc.mermaid.compile
 
 import com.engine.protoc.mermaid.ProtocGenMermaid
+import com.engine.protoc.mermaid.ProtocGenMermaid.Options.Direction
 import com.engine.protoc.util.SyntaxElement
 import com.engine.protoc.util.compiler.CodeGeneratorRequestWrapper
 import com.engine.protoc.util.compiler.CodeGeneratorResponseWrapper
@@ -43,7 +44,7 @@ import com.google.protobuf.compiler.PluginProtos
  */
 internal class Compiler(
     private val request: CodeGeneratorRequestWrapper,
-    @Suppress("UNUSED_PARAMETER") private val options: ProtocGenMermaid.Options,
+    private val options: ProtocGenMermaid.Options,
 ) {
 
     internal fun compile(): PluginProtos.CodeGeneratorResponse {
@@ -206,14 +207,24 @@ internal class Compiler(
         buildString {
             appendFrontmatter(d.title)
             appendLine("classDiagram")
+            if (options.direction != Direction.TB) appendLine("    direction ${options.direction.name}")
             appendTypes(d.enums, d.messages, d.services)
             appendArrows(d.arrows)
             appendFooter(deprecatedClassIds(d))
         }
 
     private fun StringBuilder.appendFrontmatter(title: String) {
+        val cfg = buildList {
+            if (options.hideEmptyMembersBox) add("hideEmptyMembersBox: true")
+            if (!options.hierarchicalNamespaces) add("hierarchicalNamespaces: false")
+        }
         appendLine("---")
         appendLine("  title: \"$title\"")
+        if (cfg.isNotEmpty()) {
+            appendLine("  config:")
+            appendLine("    class:")
+            cfg.forEach { appendLine("      $it") }
+        }
         appendLine("---")
     }
 
@@ -244,6 +255,10 @@ internal class Compiler(
         messages: List<DescriptorProtoWrapper>,
         services: List<ServiceDescriptorProtoWrapper>,
     ) {
+        if (options.suppressNamespaces) {
+            appendBlock(enums, messages, services, "    ")
+            return
+        }
         val byPkg = LinkedHashMap<String, TypeBucket>()
         fun bucket(p: String) = byPkg.getOrPut(p) { TypeBucket() }
         enums.forEach { bucket(index.packageOf(it)).enums.add(it) }
@@ -343,7 +358,10 @@ internal class Compiler(
     private fun renderField(
         msg: DescriptorProtoWrapper,
         field: FieldDescriptorProtoWrapper,
-    ): String = "+${fieldTypeLabel(msg, field)} ${field.name?.value ?: "?"}${deprecatedSuffix(field.options?.deprecated)}"
+    ): String {
+        val visibility = if (options.suppressVisibility) "" else "+"
+        return "$visibility${fieldTypeLabel(msg, field)} ${field.name?.value ?: "?"}${deprecatedSuffix(field.options?.deprecated)}"
+    }
 
     /** `class Foo` or `class Foo_Bar["Foo.Bar"]` depending on whether label and id diverge. */
     private fun classDeclaration(ref: TypeRef): String = if (ref.id == ref.label) "class ${ref.id}" else "class ${ref.id}[\"${ref.label}\"]"
@@ -422,19 +440,26 @@ internal class Compiler(
         return referenceId(field.type?.value, field.typeName?.value)
     }
 
-    /** Mermaid identifier for an RPC's input/output type. */
-    private fun methodTargetId(fqn: String?): String? = index.resolveFqn(fqn)?.id ?: fqn?.substringAfterLast('.')
+    /** Mermaid identifier for an RPC's input/output type, with WKT suppression applied. */
+    private fun methodTargetId(fqn: String?): String? {
+        if (isSuppressedWkt(fqn)) return null
+        return index.resolveFqn(fqn)?.id ?: fqn?.substringAfterLast('.')
+    }
 
     private fun referenceId(
         type: Type?,
         fqn: String?,
-    ): String? =
-        when (type) {
+    ): String? {
+        if (isSuppressedWkt(fqn)) return null
+        return when (type) {
             Type.TYPE_MESSAGE, Type.TYPE_ENUM, Type.TYPE_GROUP ->
                 index.resolveFqn(fqn)?.id ?: fqn?.substringAfterLast('.')
 
             else -> null
         }
+    }
+
+    private fun isSuppressedWkt(fqn: String?): Boolean = options.suppressWellKnownTypes && isWellKnownType(fqn)
 
     private fun serviceArrows(services: List<ServiceDescriptorProtoWrapper>): List<String> =
         buildList {

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.suppressns;
+
+option java_package = "com.engine.protoc.mermaid.example.suppressns";
+option java_multiple_files = true;
+
+// Exercises `suppressNamespaces=true`: even though the proto declares a package, the
+// compiler emits the message at the top of the `classDiagram` body with no surrounding
+// `namespace { ... }` wrapper.
+message Foo {
+    string id = 1;
+}

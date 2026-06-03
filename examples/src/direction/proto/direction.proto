@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.direction;
+
+option java_package = "com.engine.protoc.mermaid.example.direction";
+option java_multiple_files = true;
+
+// Exercises `direction=LR`: two related messages so the layout flow is visible as a
+// left-to-right arrow rather than Mermaid's default top-to-bottom.  The compiler emits
+// `direction LR` as a body-level statement immediately after `classDiagram`.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}
