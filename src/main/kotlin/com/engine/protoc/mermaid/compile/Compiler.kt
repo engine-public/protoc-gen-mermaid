@@ -15,6 +15,9 @@ import com.engine.protoc.util.service.ServiceDescriptorProtoWrapper
 import com.google.protobuf.DescriptorProtos.FieldDescriptorProto.Label
 import com.google.protobuf.DescriptorProtos.FieldDescriptorProto.Type
 import com.google.protobuf.compiler.PluginProtos
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger(Compiler::class.java)
 
 /**
  * Renders the in-scope schema as Mermaid `classDiagram` files.  Per compile invocation it emits a
@@ -50,6 +53,7 @@ internal class Compiler(
 ) {
 
     internal fun compile(): PluginProtos.CodeGeneratorResponse {
+        log.info("compile starting with options: {}", options)
         val response = CodeGeneratorResponseWrapper()
         if (DiagramType.FILE_OVERVIEW in options.diagramTypes) {
             for (file in index.files) response.addFile(overviewFilename(file), render(overviewDiagram(file)))

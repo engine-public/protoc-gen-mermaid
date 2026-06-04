@@ -69,6 +69,20 @@ allprojects {
 dependencies {
     implementation(libs.engine.protoc.utils)
     implementation(libs.protobuf.java)
+
+    // Compiler code calls SLF4J 2.x (LoggerFactory.getLogger, log.info(...))
+    // directly, so slf4j-api sits on the compile classpath. Ship Log4j 2 as
+    // the binding so the plugin's logLevel / logFile options can be applied
+    // programmatically via the Configurator API: log4j-core is used directly
+    // in applyLoggingConfiguration() (ConfigurationBuilder, Configurator,
+    // ConsoleAppender.Target), and log4j-slf4j2-impl is the runtime bridge
+    // from SLF4J 2.x to log4j-core. log4j-core 2.25.0+ ships its own GraalVM
+    // native-image reachability metadata, so no hand-rolled reflect/resource
+    // config is required for the core appender path.
+    implementation(libs.slf4j.api)
+    implementation(libs.log4j.api)
+    implementation(libs.log4j.core)
+    runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
 application {
