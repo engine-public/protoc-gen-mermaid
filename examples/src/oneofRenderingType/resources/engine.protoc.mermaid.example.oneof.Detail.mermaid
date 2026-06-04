@@ -1,0 +1,31 @@
+---
+  title: "Message: engine.protoc.mermaid.example.oneof.Detail"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.oneof {
+        class Detail
+
+        class Detail_kind["Detail.kind"] {
+            <<oneof>>
+            string note
+        }
+
+        class Choice {
+            string id
+            Detail detail
+        }
+
+        class Choice_selector["Choice.selector"] {
+            <<oneof>>
+            string by_name
+            int32 by_id
+        }
+    }
+
+    Choice --> "0..1" Detail : detail
+    Detail *-- "0..1" Detail_kind : kind
+    Choice *-- "0..1" Choice_selector : selector

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.oneof;
+
+option java_package = "com.engine.protoc.mermaid.example.oneof";
+option java_multiple_files = true;
+
+// Exercises `oneofRenderingType=SEPARATE`: the oneof members are extracted into their
+// own `<<oneof>>` pseudo-class joined to the parent by a composition arrow, instead of
+// the default EMBEDDED rendering that lists them inline under an `«oneof <name>»` header.
+//
+// `Choice` references `Detail`, and `Detail` itself has a oneof.  In a MESSAGE diagram
+// focused on `Choice`, `Detail` is a surrounding (outgoing-target) class — so its
+// `<<oneof>>` pseudo-class must still get its own composition arrow, not float orphaned.
+message Choice {
+    string id = 1;
+    Detail detail = 4;
+    oneof selector {
+        string by_name = 2;
+        int32 by_id = 3;
+    }
+}
+
+message Detail {
+    oneof kind {
+        string note = 1;
+    }
+}

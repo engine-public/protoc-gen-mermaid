@@ -1,0 +1,31 @@
+---
+  title: "File overview: oneof_rendering_type.proto"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.oneof {
+        class Choice {
+            string id
+            Detail detail
+        }
+
+        class Choice_selector["Choice.selector"] {
+            <<oneof>>
+            string by_name
+            int32 by_id
+        }
+
+        class Detail
+
+        class Detail_kind["Detail.kind"] {
+            <<oneof>>
+            string note
+        }
+    }
+
+    Choice --> "0..1" Detail : detail
+    Choice *-- "0..1" Choice_selector : selector
+    Detail *-- "0..1" Detail_kind : kind
