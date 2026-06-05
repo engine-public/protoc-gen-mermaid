@@ -1,0 +1,29 @@
+
+```mermaid
+---
+  title: "Message: engine.protoc.mermaid.example.embeddedMarkdown.Child"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.embeddedMarkdown {
+        class Child {
+            string id
+        }
+
+        class Parent {
+            Child child
+            Status status
+        }
+
+        class ParentService {
+            <<service>>
+            GetParent(Child) Parent
+        }
+    }
+
+    Parent --> "0..1" Child : child
+    ParentService ..> "1" Child : GetParent
+```

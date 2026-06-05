@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.outputType;
+
+option java_package = "com.engine.protoc.mermaid.example.outputType";
+option java_multiple_files = true;
+
+// Exercises `outputType=STANDALONE_MARKDOWN`: each emitted artifact is a `.md` file whose
+// `classDiagram` body is wrapped in a fenced ```mermaid block prefixed by a Markdown
+// `# <title>` heading derived from the diagram's title.  The proto is intentionally minimal
+// so the wrapper differences are the visible signal in the resulting fixtures.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}
