@@ -1,0 +1,16 @@
+---
+  title: "Package: engine.protoc.mermaid.example.pkg.beta"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.pkg.beta {
+        class Beta {
+            string id
+            Alpha alpha
+        }
+    }
+
+    Beta --> "0..1" Alpha : alpha

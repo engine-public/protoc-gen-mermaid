@@ -96,6 +96,56 @@ public class ProtocGenMermaid(
          */
         public val outputType: OutputType,
         /**
+         * Name of the protoc insertion point a [DiagramType.FILE_OVERVIEW] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  This is the *prefix* only: the compiler appends the
+         * runtime scope `:<proto>` (the originating `.proto` path) so each file's overview lands on
+         * its own scoped point.  Default `file_header_scope`, matching the `file_header_scope:<proto>`
+         * point protoc-gen-markdown emits at the top of each per-file `.md`.  Has no effect under any
+         * other [outputType].
+         */
+        public val fileOverviewInsertionPoint: String,
+        /**
+         * Name of the protoc insertion point a [DiagramType.MESSAGE] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  This is the *prefix* only: the compiler appends the
+         * runtime scope `:<fqn>` (the message's fully-qualified name) so each message diagram lands
+         * on its own scoped point.  Default `message_header_scope`, matching the
+         * `message_header_scope:<fqn>` point protoc-gen-markdown emits above each message section.
+         * Has no effect under any other [outputType].
+         */
+        public val messageInsertionPoint: String,
+        /**
+         * Name of the protoc insertion point a [DiagramType.SERVICE] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  This is the *prefix* only: the compiler appends the
+         * runtime scope `:<fqn>` (the service's fully-qualified name) so each service diagram lands
+         * on its own scoped point.  Default `service_header_scope`, matching the
+         * `service_header_scope:<fqn>` point protoc-gen-markdown emits above each service section.
+         * Has no effect under any other [outputType].
+         */
+        public val serviceInsertionPoint: String,
+        /**
+         * Name of the protoc insertion point an [DiagramType.ENUMERATION] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  This is the *prefix* only: the compiler appends the
+         * runtime scope `:<fqn>` (the enum's fully-qualified name) so each enum diagram lands on its
+         * own scoped point.  Default `enum_header_scope`, matching the `enum_header_scope:<fqn>`
+         * point protoc-gen-markdown emits above each enum section.  Has no effect under any other
+         * [outputType].
+         */
+        public val enumerationInsertionPoint: String,
+        /**
+         * Name of the protoc insertion point the [DiagramType.COMPLETE] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  Emitted verbatim with no scope suffix.  Default
+         * `file_header`, matching the bare `file_header` point protoc-gen-markdown emits in the root
+         * `overview.md` navigation file.  Has no effect under any other [outputType].
+         */
+        public val completeInsertionPoint: String,
+        /**
+         * Name of the protoc insertion point each [DiagramType.PACKAGE] diagram targets under
+         * [OutputType.EMBEDDED_MARKDOWN].  Emitted verbatim with no scope suffix.  Default
+         * `file_header`, matching the bare `file_header` point protoc-gen-markdown emits in each
+         * package-index navigation file.  Has no effect under any other [outputType].
+         */
+        public val packageInsertionPoint: String,
+        /**
          * When true (default), protobuf well-known types (anything under the `google.protobuf.*`
          * namespace — `Timestamp`, `Duration`, `Any`, `Empty`, `Struct`, `FieldMask`, `Value`,
          * the `*Value` wrappers, etc.) are suppressed from the relationship graph: no class block,
@@ -169,8 +219,55 @@ public class ProtocGenMermaid(
              * Filename = the largest common dotted-package prefix of the input protos + `.mermaid`
              * (e.g. `pkg.sub.mermaid`); falls back to `complete.mermaid` if the inputs share no
              * package prefix.
+             *
+             * In [OutputType.EMBEDDED_MARKDOWN] this diagram targets the `file_header` insertion
+             * point of the `overview.md` navigation file protoc-gen-markdown emits — which requires
+             * that plugin's `includeIndices=true` and `outputType != SINGLE_FILE`.
              */
             COMPLETE,
+
+            /**
+             * One file per distinct proto `package` in scope.  Contains every top-level enum,
+             * message, and service across all in-scope files declaring that package, plus the same
+             * association/dependency/nesting arrows [COMPLETE] draws, scoped to the package.
+             * Filename = the dotted package name + `.package.mermaid` (e.g. `pkg.sub.package.mermaid`
+             * — the flattened form of protoc-gen-markdown's `<pkg-as-dir>/package.md`, whose
+             * `.package` leaf keeps it from colliding with the [COMPLETE] file); files with no
+             * `package` directive collapse into one `default.package.mermaid` diagram.
+             *
+             * In [OutputType.EMBEDDED_MARKDOWN] this diagram targets the `file_header` insertion
+             * point of each package-index navigation file protoc-gen-markdown emits — which requires
+             * that plugin's `includeIndices=true` and `outputType=PER_FILE`.
+             */
+            PACKAGE,
+
+            /**
+             * One file per service in scope.  Contains the focus service's class block, a class
+             * block for every in-scope message it references via an RPC input or output, and only
+             * the focus service's RPC dependency arrows (`Service ..> "1" Message : rpc`); nothing
+             * references a service, and RPC types are always messages, so there is no incoming side
+             * and no enum.  Filename = fully-qualified service name + `.mermaid`
+             * (e.g. `pkg.sub.FooService.mermaid`).
+             *
+             * In [OutputType.EMBEDDED_MARKDOWN] this diagram targets the `service_header_scope:<fqn>`
+             * insertion point protoc-gen-markdown emits above each service section in the per-file
+             * `.md` — see [serviceInsertionPoint].
+             */
+            SERVICE,
+
+            /**
+             * One file per enum in scope, top-level or nested.  Contains the focus enum's class
+             * block, a class block for every other in-scope message with a field referencing the
+             * enum, and only the association arrows that target the enum (no relationships between
+             * the surrounding classes are drawn).  Enums have no outgoing references and cannot be
+             * referenced by RPCs.  Filename = fully-qualified enum name + `.mermaid` (e.g.
+             * `pkg.sub.Outer.Color.mermaid` for an enum nested in `Outer`).
+             *
+             * In [OutputType.EMBEDDED_MARKDOWN] this diagram targets the `enum_header_scope:<fqn>`
+             * insertion point protoc-gen-markdown emits above each enum section in the per-file
+             * `.md` — see [enumerationInsertionPoint].
+             */
+            ENUMERATION,
         }
 
         /**
@@ -223,6 +320,23 @@ public class ProtocGenMermaid(
              * `.md` files produced by protoc-gen-markdown (its `PER_FILE` mode, the default).
              * Content is a fenced ` ```mermaid ` code block with no surrounding heading — the host
              * markdown already supplies the section header directly above the insertion point.
+             * Each [com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse.File] in the
+             * response carries an `insertion_point` keyed to a diagram kind:
+             *
+             *  - [DiagramType.FILE_OVERVIEW] → `file_header_scope:<proto>` in the per-file `.md`
+             *    (`name` = `<proto>` with `.proto` swapped for `.md`).
+             *  - [DiagramType.MESSAGE] → `message_header_scope:<fqn>` in that same per-file `.md`.
+             *  - [DiagramType.COMPLETE] → `file_header` in the root `overview.md`.
+             *  - [DiagramType.PACKAGE] → `file_header` in each package-index file (`<pkg-as-dir>/
+             *    package.md`, `<pkg>.md`, or `default.md`, matching the markdown plugin's naming).
+             *
+             * Requires the markdown plugin's `generateInsertionPoints` option (default on) and
+             * `outputType=PER_FILE` (default).  COMPLETE and PACKAGE additionally require the
+             * markdown plugin's `includeIndices=true` so the `overview.md` / package-index files
+             * they target actually exist; without them protoc rejects the response with an
+             * insertion-point-not-found error.  Restrict [diagramTypes] (e.g.
+             * `diagramTypes=FILE_OVERVIEW,MESSAGE`) when the markdown run does not emit those
+             * navigation files.
              */
             EMBEDDED_MARKDOWN,
         }
@@ -264,6 +378,24 @@ public class ProtocGenMermaid(
             public var outputType: OutputType =
                 parameters.get<OutputType>("outputType") ?: OutputType.STANDALONE_MERMAID
 
+            public var fileOverviewInsertionPoint: String =
+                parameters.get<String>("fileOverviewInsertionPoint") ?: "file_header_scope"
+
+            public var messageInsertionPoint: String =
+                parameters.get<String>("messageInsertionPoint") ?: "message_header_scope"
+
+            public var serviceInsertionPoint: String =
+                parameters.get<String>("serviceInsertionPoint") ?: "service_header_scope"
+
+            public var enumerationInsertionPoint: String =
+                parameters.get<String>("enumerationInsertionPoint") ?: "enum_header_scope"
+
+            public var completeInsertionPoint: String =
+                parameters.get<String>("completeInsertionPoint") ?: "file_header"
+
+            public var packageInsertionPoint: String =
+                parameters.get<String>("packageInsertionPoint") ?: "file_header"
+
             public var suppressWellKnownTypes: Boolean = parameters.get<Boolean>("suppressWellKnownTypes") ?: true
 
             public var direction: Direction = parameters.get<Direction>("direction") ?: Direction.TB
@@ -285,6 +417,12 @@ public class ProtocGenMermaid(
                     diagramTypes = diagramTypes,
                     oneofRenderingType = oneofRenderingType,
                     outputType = outputType,
+                    fileOverviewInsertionPoint = fileOverviewInsertionPoint,
+                    messageInsertionPoint = messageInsertionPoint,
+                    serviceInsertionPoint = serviceInsertionPoint,
+                    enumerationInsertionPoint = enumerationInsertionPoint,
+                    completeInsertionPoint = completeInsertionPoint,
+                    packageInsertionPoint = packageInsertionPoint,
                     suppressWellKnownTypes = suppressWellKnownTypes,
                     direction = direction,
                     logLevel = logLevel,

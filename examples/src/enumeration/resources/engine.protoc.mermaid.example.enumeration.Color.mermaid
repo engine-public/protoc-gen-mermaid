@@ -1,0 +1,23 @@
+---
+  title: "Enum: engine.protoc.mermaid.example.enumeration.Color"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.enumeration {
+        class Color {
+            <<enumeration>>
+            COLOR_UNSPECIFIED
+            COLOR_RED
+            COLOR_GREEN
+        }
+
+        class Palette {
+            Color primary
+            Shape.Style style
+        }
+    }
+
+    Palette --> "1" Color : primary

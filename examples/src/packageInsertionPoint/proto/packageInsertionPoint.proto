@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.packageInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.packageInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `packageInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: each PACKAGE diagram lands
+// on the bare `custom_package` point in its package-index file instead of the default `file_header`.
+// The value is emitted verbatim with no scope suffix.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}

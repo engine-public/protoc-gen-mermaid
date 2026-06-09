@@ -1,0 +1,28 @@
+
+```mermaid
+---
+  title: "File overview: serviceInsertionPoint.proto"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.serviceInsertionPoint {
+        class PingRequest {
+            string message
+        }
+
+        class PingResponse {
+            string message
+        }
+
+        class PingService {
+            <<service>>
+            Ping(PingRequest) PingResponse
+        }
+    }
+
+    PingService ..> "1" PingRequest : Ping
+    PingService ..> "1" PingResponse : Ping
+```

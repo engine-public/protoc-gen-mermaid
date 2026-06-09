@@ -8,6 +8,9 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.protobuf).apply(false)
+    // Pinned on the build classpath (the protobuf plugin pulls it in transitively without a
+    // version) so the examples subproject's end-to-end task can read `osdetector.classifier`.
+    alias(libs.plugins.osdetector).apply(false)
 }
 
 description = "protoc compiler to turn gRPC services into mermaid class diagrams"

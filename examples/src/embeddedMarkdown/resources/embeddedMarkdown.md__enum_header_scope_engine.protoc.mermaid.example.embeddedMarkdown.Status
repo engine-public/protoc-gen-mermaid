@@ -1,0 +1,25 @@
+
+```mermaid
+---
+  title: "Enum: engine.protoc.mermaid.example.embeddedMarkdown.Status"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.embeddedMarkdown {
+        class Status {
+            <<enumeration>>
+            STATUS_UNSPECIFIED
+            STATUS_ACTIVE
+        }
+
+        class Parent {
+            Child child
+            Status status
+        }
+    }
+
+    Parent --> "1" Status : status
+```

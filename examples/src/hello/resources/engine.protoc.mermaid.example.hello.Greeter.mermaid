@@ -1,0 +1,21 @@
+---
+  title: "Service: engine.protoc.mermaid.example.hello.Greeter"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.hello {
+        class Greeting {
+            string text
+        }
+
+        class Greeter {
+            <<service>>
+            SayHello(Greeting) Greeting
+        }
+    }
+
+    Greeter ..> "1" Greeting : SayHello
+    Greeter ..> "1" Greeting : SayHello

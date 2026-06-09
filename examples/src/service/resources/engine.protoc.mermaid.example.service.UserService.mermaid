@@ -1,0 +1,33 @@
+---
+  title: "Service: engine.protoc.mermaid.example.service.UserService"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.service {
+        class CreateUserRequest {
+            string name
+        }
+
+        class User {
+            string id
+            string name
+        }
+
+        class GetUserRequest {
+            string id
+        }
+
+        class UserService {
+            <<service>>
+            CreateUser(CreateUserRequest) User
+            GetUser(GetUserRequest) User
+        }
+    }
+
+    UserService ..> "1" CreateUserRequest : CreateUser
+    UserService ..> "1" User : CreateUser
+    UserService ..> "1" GetUserRequest : GetUser
+    UserService ..> "1" User : GetUser

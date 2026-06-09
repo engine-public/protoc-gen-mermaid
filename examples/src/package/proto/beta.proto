@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.pkg.beta;
+
+import "alpha.proto";
+
+option java_package = "com.engine.protoc.mermaid.example.pkg.beta";
+option java_multiple_files = true;
+
+// The other half of the `diagramTypes=PACKAGE` example: package `...pkg.beta`,
+// with a field referencing `...pkg.alpha.Alpha`.  Because the cross-package target
+// is not part of beta's own package diagram, the field line keeps the type name but
+// draws no arrow — demonstrating that PACKAGE diagrams are scoped to a single package.
+message Beta {
+    string id = 1;
+    engine.protoc.mermaid.example.pkg.alpha.Alpha alpha = 2;
+}

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.serviceInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.serviceInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `serviceInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: each SERVICE diagram
+// lands on `custom_service_scope:<fqn>` instead of the default `service_header_scope:<fqn>`.  The
+// compiler still appends the runtime `:<fqn>` scope — only the prefix is overridden.
+message PingRequest {
+    string message = 1;
+}
+
+message PingResponse {
+    string message = 1;
+}
+
+service PingService {
+    rpc Ping(PingRequest) returns (PingResponse);
+}

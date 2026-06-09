@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.fileOverviewInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.fileOverviewInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `fileOverviewInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: the FILE_OVERVIEW
+// diagram lands on `custom_overview_scope:<proto>` instead of the default `file_header_scope:<proto>`.
+// The compiler still appends the runtime `:<proto>` scope — only the prefix is overridden.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}

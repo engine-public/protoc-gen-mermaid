@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.enumerationInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.enumerationInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `enumerationInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: each ENUMERATION
+// diagram lands on `custom_enum_scope:<fqn>` instead of the default `enum_header_scope:<fqn>`.  The
+// compiler still appends the runtime `:<fqn>` scope — only the prefix is overridden.
+enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_ACTIVE = 1;
+    STATUS_CLOSED = 2;
+}
+
+message Account {
+    Status status = 1;
+}

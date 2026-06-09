@@ -1,0 +1,25 @@
+
+```mermaid
+---
+  title: "File overview: enumerationInsertionPoint.proto"
+  config:
+    class:
+      hideEmptyMembersBox: true
+      hierarchicalNamespaces: false
+---
+classDiagram
+    namespace engine.protoc.mermaid.example.enumerationInsertionPoint {
+        class Status {
+            <<enumeration>>
+            STATUS_UNSPECIFIED
+            STATUS_ACTIVE
+            STATUS_CLOSED
+        }
+
+        class Account {
+            Status status
+        }
+    }
+
+    Account --> "1" Status : status
+```

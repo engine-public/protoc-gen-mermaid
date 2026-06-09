@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package engine.protoc.mermaid.example.completeInsertionPoint;
+
+option java_package = "com.engine.protoc.mermaid.example.completeInsertionPoint";
+option java_multiple_files = true;
+
+// Exercises `completeInsertionPoint` under `outputType=EMBEDDED_MARKDOWN`: the COMPLETE diagram lands
+// on the bare `custom_complete` point in `overview.md` instead of the default `file_header`.  The
+// value is emitted verbatim with no scope suffix.
+message Parent {
+    Child child = 1;
+}
+
+message Child {
+    string id = 1;
+}
