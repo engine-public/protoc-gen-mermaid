@@ -101,3 +101,27 @@ application {
 tasks.named<JavaExec>("run") {
     standardInput = System.`in`
 }
+
+val versionResourceDir = layout.buildDirectory.dir("generated/resources/version")
+
+val writeVersionResource =
+    tasks.register("writeVersionResource") {
+        group = "build"
+        description = "Writes project.version to a namespaced classpath resource."
+
+        val versionString = project.version.toString()
+        val outDir = versionResourceDir
+
+        inputs.property("version", versionString)
+        outputs.dir(outDir)
+
+        doLast {
+            val file = outDir.get().file("META-INF/com.engine.protoc.mermaid/version").asFile
+            file.parentFile.mkdirs()
+            file.writeText(versionString)
+        }
+    }
+
+sourceSets.named("main") {
+    resources.srcDir(writeVersionResource.map { versionResourceDir })
+}
