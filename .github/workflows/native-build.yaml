@@ -94,6 +94,16 @@ jobs:
           EOF
           fi
 
+      # GraalVM native-image needs the MSVC toolchain (vcvarsall/cl.exe) on
+      # Windows. setup-graalvm skips MSVC env setup for GraalVM JDK 17+, expecting
+      # native-image to auto-detect Visual Studio; that detection fails on this
+      # runner. Export the MSVC env explicitly. Must run before the first gradlew
+      # call so the Gradle daemon (and thus the native-image child process)
+      # inherits these vars.
+      - name: "Set up MSVC environment (Windows)"
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
       - name: Setup gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # https://github.com/gradle/actions/releases/tag/v6.1.0
 
