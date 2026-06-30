@@ -85,7 +85,7 @@ Each map entry isolates a single compiler option from its default; the `hello` s
 
 Each suite runs:
 
-1. `protoc` with the `recorder` plugin (a native binary published as `com.engine:protoc-utils-recorder` from [hotelengine/protoc-utils](https://github.com/HotelEngine/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
+1. `protoc` with the `recorder` plugin (a native binary published as `com.engine:protoc-utils-recorder` from [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
 2. A `Dumper` subclass under `src/<name>/kotlin/` that loads the `.binpb`, feeds it to `ProtocGenMermaid.compile()` at the same options the recorder used, and writes each output file into `src/<name>/resources/`.
 
 Tests use [kotest](https://kotest.io) `FunSpec` style.
