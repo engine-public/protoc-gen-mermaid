@@ -27,6 +27,24 @@ buildscript {
                 useVersion("3.6.1")
                 because("plexus-utils directory traversal (GHSA-6fmv-xxpf-w3cw)")
             }
+            /*
+             * Seven jackson-databind advisories — PolymorphicTypeValidator
+             * bypasses (CVE-2026-54513, CVE-2026-54512), @JsonView / @JsonIgnore /
+             * @JsonIgnoreProperties bypasses (CVE-2026-54517, CVE-2026-54516,
+             * CVE-2026-54515, CVE-2026-54518), and InetSocketAddress eager-DNS
+             * SSRF (CVE-2026-54514). jackson resolves to 2.21.2 transitively via
+             * the CycloneDX and JReleaser plugins. 2.22.0 is the first published
+             * release exceeding every vulnerable range — the 2.21.5 patch
+             * Dependabot names for CVE-2026-54515 was never released to Maven
+             * Central. jackson-core is bumped in lock-step to avoid databind/core
+             * skew; jackson-annotations tracks its own 2.22 line via the BOM.
+             */
+            if (requested.group == "com.fasterxml.jackson.core" &&
+                (requested.name == "jackson-databind" || requested.name == "jackson-core")
+            ) {
+                useVersion("2.22.0")
+                because("jackson-databind advisories (CVE-2026-54512 … CVE-2026-54518)")
+            }
         }
     }
 }
