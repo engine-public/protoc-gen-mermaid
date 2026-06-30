@@ -1035,6 +1035,6 @@ internal class Compiler(
         const val DEPRECATED_CSS_CLASS = "deprecated"
         const val DEPRECATED_CLASS_DEF = "classDef deprecated color:#888,text-decoration:line-through"
         const val DEPRECATED_MEMBER_LABEL = " «deprecated»"
-        const val RELEASE_URL_PREFIX = "https://github.com/hotelengine/protoc-gen-mermaid/releases/tag"
+        const val RELEASE_URL_PREFIX = "https://github.com/engine-public/protoc-gen-mermaid/releases/tag"
     }
 }
