@@ -45,6 +45,14 @@ buildscript {
                 useVersion("2.22.0")
                 because("jackson-databind advisories (CVE-2026-54512 … CVE-2026-54518)")
             }
+            /*
+             * GHSA-9pwp-9qqc-pr26 / CVE-2026-8763 — bcprov-jdk18on. Transitive of
+             * JReleaser (via bcpg/bcpkix signing stack).
+             */
+            if (requested.group == "org.bouncycastle") {
+                useVersion("1.85")
+                because("bcprov-jdk18on GHSA-9pwp-9qqc-pr26 / CVE-2026-8763")
+            }
         }
     }
 }
