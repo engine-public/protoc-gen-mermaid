@@ -48,9 +48,23 @@ Options are passed as `--mermaid_out=<comma-separated-options>:<outdir>`.
 
 Configure the [`protobuf-gradle-plugin`](https://github.com/google/protobuf-gradle-plugin) to invoke `protoc-gen-mermaid` as a code-generation plugin.
 
+Released artifacts are published to [GitHub Packages](https://github.com/engine-public/protoc-gen-mermaid/packages).
+GitHub Packages requires authentication to download from a Maven repository — even for public repositories — so consumers need a [GitHub personal access token](https://github.com/settings/tokens) with the `read:packages` scope.
+
 ```kotlin
 plugins {
     id("com.google.protobuf") version "0.9.6"
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/engine-public/protoc-gen-mermaid")
+        credentials {
+            username = providers.gradleProperty("gpr.user").orElse(providers.environmentVariable("GITHUB_ACTOR")).get()
+            password = providers.gradleProperty("gpr.key").orElse(providers.environmentVariable("GITHUB_TOKEN")).get()
+        }
+    }
 }
 
 protobuf {

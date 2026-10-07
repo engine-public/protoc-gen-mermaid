@@ -62,11 +62,17 @@ Review the resulting diff under `src/main/resources/META-INF/native-image/...` b
 
 ## Publishing
 
-Publication is handled by `maven-publish` + JReleaser, configured at the root [`build.gradle.kts`](build.gradle.kts).
+Publication is handled by `maven-publish`, configured at the root [`build.gradle.kts`](build.gradle.kts), and targets [GitHub Packages](https://github.com/engine-public/protoc-gen-mermaid/packages).
 The published artifact is POM-only (no main jar) with one classified `.exe` per platform: `linux-x86_64`, `linux-aarch_64`, `osx-aarch_64`, `windows-x86_64`.
 A `cyclonedx`-classified JSON BOM is also attached.
 
-The release workflow at [`.github/workflows/release.yaml`](.github/workflows/release.yaml) is `workflow_dispatch`-triggered: it runs the JVM build, fans out the native build across the four platforms, tags the commit, drafts the GitHub release, and stages the Maven Central deployment for manual promotion.
+Releases are cut by running the `Release` workflow ([`.github/workflows/release.yaml`](.github/workflows/release.yaml)) via `workflow_dispatch`.
+It fans out to `build.yaml` (JVM build, SBOMs) and `native-build.yaml` (one native binary per platform), then publishes to GitHub Packages, tags the commit, and attaches the same artifacts to a GitHub Release.
+
+Publishing runs `./gradlew publishAllPublicationsToGitHubPackagesRepository`, which pushes `com.engine:protoc-gen-mermaid`.
+It authenticates with the `GITHUB_ACTOR` / `GITHUB_TOKEN` environment variables; the release job supplies the workflow token with `packages: write`, so no additional secrets are needed.
+The publication picks up native binaries from `ENGINE_NATIVE_BIN_DIR` when set, otherwise it attaches only the host's binary from the local `nativeCompile` output.
+Use `./gradlew publishToMavenLocal` to inspect the published artifact set without uploading anything.
 
 ## Code Style
 
