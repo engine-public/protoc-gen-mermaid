@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   native-build:
@@ -32,6 +33,10 @@ jobs:
           - classifier: windows-x86_64
             runs-on: windows-latest
     runs-on: ${{ matrix.runs-on }}
+    env:
+      # protoc-utils is published to GitHub Packages, which requires auth even for public packages.
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

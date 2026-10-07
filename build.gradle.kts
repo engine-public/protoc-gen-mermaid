@@ -171,6 +171,21 @@ allprojects {
 
     repositories {
         mavenCentral()
+        /*
+         * protoc-utils (library + recorder) is published only to GitHub Packages,
+         * which requires a token with read:packages even for public packages.
+         */
+        maven {
+            name = "protocUtils"
+            url = uri("https://maven.pkg.github.com/engine-public/protoc-utils")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orElse(providers.environmentVariable("GITHUB_ACTOR")).orNull
+                password = providers.gradleProperty("gpr.key").orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
+            }
+            content {
+                includeModuleByRegex("com\\.engine", "protoc-utils.*")
+            }
+        }
     }
 
     configurations.named("ktlint").configure {

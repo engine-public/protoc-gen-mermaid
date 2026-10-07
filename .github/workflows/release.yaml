@@ -17,6 +17,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build:
@@ -36,6 +37,11 @@ jobs:
     needs: [build, native-build]
     permissions:
       contents: write
+      packages: read
+    env:
+      # protoc-utils is published to GitHub Packages, which requires auth even for public packages.
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

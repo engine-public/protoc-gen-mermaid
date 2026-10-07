@@ -4,6 +4,9 @@
 
 - GraalVM 21 (the Gradle toolchain spec pins `JvmVendorSpec.GRAAL_VM`; install via SDKMAN, asdf, or the [GraalVM downloads page](https://www.graalvm.org/downloads/) — `.tool-versions` selects `graalvm-community-21.0.2` for asdf).
 - A POSIX shell environment.
+- A [GitHub personal access token](https://github.com/settings/tokens) with the `read:packages` scope.
+  The [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils) dependencies are published to GitHub Packages, which requires authentication even for public packages.
+  Set `gpr.user` (your GitHub username) and `gpr.key` (the token) in `~/.gradle/gradle.properties`, or export `GITHUB_ACTOR` and `GITHUB_TOKEN`.
 
 The version of the produced artifacts is read from the `ENGINE_BUILD_VERSION` environment variable and falls back to `0.0.0-pre.0` when unset.
 
@@ -85,7 +88,7 @@ Each map entry isolates a single compiler option from its default; the `hello` s
 
 Each suite runs:
 
-1. `protoc` with the `recorder` plugin (a native binary published as `com.engine:protoc-utils-recorder` from [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
+1. `protoc` with the `recorder` plugin (a native binary published to GitHub Packages as `com.engine:protoc-utils-recorder` from [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
 2. A `Dumper` subclass under `src/<name>/kotlin/` that loads the `.binpb`, feeds it to `ProtocGenMermaid.compile()` at the same options the recorder used, and writes each output file into `src/<name>/resources/`.
 
 Tests use [kotest](https://kotest.io) `FunSpec` style.
