@@ -11,10 +11,9 @@ plugins {
 }
 
 /*
- * protoc-gen-markdown ships only as a POM + per-platform native binaries (no JVM jar) and is
- * not on Maven Central yet; it's published to the local Maven repo as
- * `com.engine:protoc-gen-markdown:0.0.0-pre.0:<os>-<arch>@exe`.  Pull it from there for the
- * end-to-end embedded verification task below.
+ * protoc-gen-markdown ships only as a POM + per-platform native binaries (no JVM jar).  The
+ * end-to-end embedded verification task below consumes a local build of it, published to the
+ * local Maven repo as `com.engine:protoc-gen-markdown:0.0.0-pre.0:<os>-<arch>@exe`.
  */
 repositories {
     mavenLocal()

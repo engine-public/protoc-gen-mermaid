@@ -4,6 +4,9 @@
 
 - GraalVM 21 (the Gradle toolchain spec pins `JvmVendorSpec.GRAAL_VM`; install via SDKMAN, asdf, or the [GraalVM downloads page](https://www.graalvm.org/downloads/) — `.tool-versions` selects `graalvm-community-21.0.2` for asdf).
 - A POSIX shell environment.
+- A [GitHub personal access token](https://github.com/settings/tokens) with the `read:packages` scope.
+  The [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils) dependencies are published to GitHub Packages, which requires authentication even for public packages.
+  Set `gpr.user` (your GitHub username) and `gpr.key` (the token) in `~/.gradle/gradle.properties`, or export `GITHUB_ACTOR` and `GITHUB_TOKEN`.
 
 The version of the produced artifacts is read from the `ENGINE_BUILD_VERSION` environment variable and falls back to `0.0.0-pre.0` when unset.
 
@@ -59,11 +62,17 @@ Review the resulting diff under `src/main/resources/META-INF/native-image/...` b
 
 ## Publishing
 
-Publication is handled by `maven-publish` + JReleaser, configured at the root [`build.gradle.kts`](build.gradle.kts).
+Publication is handled by `maven-publish`, configured at the root [`build.gradle.kts`](build.gradle.kts), and targets [GitHub Packages](https://github.com/engine-public/protoc-gen-mermaid/packages).
 The published artifact is POM-only (no main jar) with one classified `.exe` per platform: `linux-x86_64`, `linux-aarch_64`, `osx-aarch_64`, `windows-x86_64`.
 A `cyclonedx`-classified JSON BOM is also attached.
 
-The release workflow at [`.github/workflows/release.yaml`](.github/workflows/release.yaml) is `workflow_dispatch`-triggered: it runs the JVM build, fans out the native build across the four platforms, tags the commit, drafts the GitHub release, and stages the Maven Central deployment for manual promotion.
+Releases are cut by running the `Release` workflow ([`.github/workflows/release.yaml`](.github/workflows/release.yaml)) via `workflow_dispatch`.
+It fans out to `build.yaml` (JVM build, SBOMs) and `native-build.yaml` (one native binary per platform), then publishes to GitHub Packages, tags the commit, and attaches the same artifacts to a GitHub Release.
+
+Publishing runs `./gradlew publishAllPublicationsToGitHubPackagesRepository`, which pushes `com.engine:protoc-gen-mermaid`.
+It authenticates with the `GITHUB_ACTOR` / `GITHUB_TOKEN` environment variables; the release job supplies the workflow token with `packages: write`, so no additional secrets are needed.
+The publication picks up native binaries from `ENGINE_NATIVE_BIN_DIR` when set, otherwise it attaches only the host's binary from the local `nativeCompile` output.
+Use `./gradlew publishToMavenLocal` to inspect the published artifact set without uploading anything.
 
 ## Code Style
 
@@ -85,7 +94,7 @@ Each map entry isolates a single compiler option from its default; the `hello` s
 
 Each suite runs:
 
-1. `protoc` with the `recorder` plugin (a native binary published as `com.engine:protoc-utils-recorder` from [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
+1. `protoc` with the `recorder` plugin (a native binary published to GitHub Packages as `com.engine:protoc-utils-recorder` from [engine-public/protoc-utils](https://github.com/engine-public/protoc-utils)) to capture the raw `CodeGeneratorRequest` as `code-generator-request.binpb`.
 2. A `Dumper` subclass under `src/<name>/kotlin/` that loads the `.binpb`, feeds it to `ProtocGenMermaid.compile()` at the same options the recorder used, and writes each output file into `src/<name>/resources/`.
 
 Tests use [kotest](https://kotest.io) `FunSpec` style.

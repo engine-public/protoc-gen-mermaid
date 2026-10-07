@@ -12,6 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: read
+    env:
+      # protoc-utils is published to GitHub Packages, which requires auth even for public packages.
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
