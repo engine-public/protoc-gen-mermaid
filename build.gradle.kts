@@ -11,22 +11,21 @@ buildscript {
     configurations.classpath {
         resolutionStrategy.eachDependency {
             /*
-             * Seven jackson-databind advisories — PolymorphicTypeValidator
-             * bypasses (CVE-2026-54513, CVE-2026-54512), @JsonView / @JsonIgnore /
-             * @JsonIgnoreProperties bypasses (CVE-2026-54517, CVE-2026-54516,
-             * CVE-2026-54515, CVE-2026-54518), and InetSocketAddress eager-DNS
-             * SSRF (CVE-2026-54514). jackson resolves to 2.21.2 transitively via
-             * the CycloneDX plugin. 2.22.0 is the first published
-             * release exceeding every vulnerable range — the 2.21.5 patch
-             * Dependabot names for CVE-2026-54515 was never released to Maven
-             * Central. jackson-core is bumped in lock-step to avoid databind/core
-             * skew; jackson-annotations tracks its own 2.22 line via the BOM.
+             * jackson resolves to 2.22.2 transitively via the CycloneDX plugin
+             * (cyclonedx-core-java 13.2.0 imports jackson-bom 2.22.2), which is
+             * still affected by GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89
+             * (jackson-core DoS / ReDoS), GHSA-cxp5-3px4-pw24, and
+             * GHSA-wv8q-qhhj-9h54 (jackson-databind DoS). 2.22.3 is the first
+             * fixed release. jackson-core is bumped in lock-step to avoid
+             * databind/core skew; jackson-annotations tracks its own 2.22 line
+             * via the BOM. Drop this pin once cyclonedx-core-java imports
+             * jackson-bom 2.22.3 or later.
              */
             if (requested.group == "com.fasterxml.jackson.core" &&
                 (requested.name == "jackson-databind" || requested.name == "jackson-core")
             ) {
-                useVersion("2.22.0")
-                because("jackson-databind advisories (CVE-2026-54512 … CVE-2026-54518)")
+                useVersion("2.22.3")
+                because("jackson DoS advisories (GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89, GHSA-cxp5-3px4-pw24, GHSA-wv8q-qhhj-9h54)")
             }
         }
     }
