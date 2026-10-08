@@ -2,7 +2,7 @@
 kotlin = "2.3.20"
 protobuf = "4.34.1"
 kotest = "6.1.4"
-engine-protoc-utils = "1.0.3"
+engine-protoc-utils = "1.1.0"
 graalvm-sdk = "23.1.2"
 log4j = "2.26.1"
 slf4j = "2.0.17"
